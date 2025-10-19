@@ -5,7 +5,27 @@ import (
 	"fmt"
 )
 
-templ CompaniesList(companies []db.Company) {
+func getSortLink(currentSort, currentOrder, column string) string {
+	if currentSort == column {
+		if currentOrder == "asc" {
+			return fmt.Sprintf("?sort=%s&order=desc", column)
+		}
+		return fmt.Sprintf("?sort=%s&order=asc", column)
+	}
+	return fmt.Sprintf("?sort=%s&order=asc", column)
+}
+
+func getSortIcon(currentSort, currentOrder, column string) string {
+	if currentSort != column {
+		return "↕"
+	}
+	if currentOrder == "asc" {
+		return "↑"
+	}
+	return "↓"
+}
+
+templ CompaniesList(companies []db.Company, sortBy, order string) {
 	@Layout("Companies") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -24,11 +44,26 @@ templ CompaniesList(companies []db.Company) {
 					<table class="min-w-full divide-y divide-gray-300 border border-gray-300">
 						<thead class="bg-gray-50">
 							<tr class="divide-x divide-gray-200">
-								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "name")) } class="group inline-flex hover:text-indigo-600">
+										Name
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "name") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Description</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">URL</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">HQ City</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">HQ State</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "hq_city")) } class="group inline-flex hover:text-indigo-600">
+										HQ City
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "hq_city") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "hq_state")) } class="group inline-flex hover:text-indigo-600">
+										HQ State
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "hq_state") }</span>
+									</a>
+								</th>
 								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 									<span class="sr-only">Actions</span>
 								</th>

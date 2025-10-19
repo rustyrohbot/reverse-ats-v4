@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,20 +13,84 @@ import (
 
 type ContactsHandler struct {
 	queries *db.Queries
+	dbConn  *sql.DB
 }
 
-func NewContactsHandler(queries *db.Queries) *ContactsHandler {
-	return &ContactsHandler{queries: queries}
+func NewContactsHandler(queries *db.Queries, dbConn *sql.DB) *ContactsHandler {
+	return &ContactsHandler{queries: queries, dbConn: dbConn}
 }
 
 func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) {
-	contacts, err := h.queries.ListContactsWithCompany(r.Context())
+	sortBy := r.URL.Query().Get("sort")
+	order := r.URL.Query().Get("order")
+
+	// Map display names to actual column/field names
+	sortColumnMap := map[string]string{
+		"company_name": "c.name",
+		"first_name":   "ct.first_name",
+		"last_name":    "ct.last_name",
+	}
+
+	sortCol, ok := sortColumnMap[sortBy]
+	if !ok {
+		sortBy = "company_name"
+		sortCol = "c.name"
+	}
+
+	if order != "asc" && order != "desc" {
+		order = "asc"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			ct.contact_id,
+			ct.company_id,
+			ct.first_name,
+			ct.last_name,
+			ct.role,
+			ct.email,
+			ct.phone,
+			ct.linkedin,
+			ct.notes,
+			ct.created_at,
+			ct.updated_at,
+			c.name as company_name
+		FROM contacts ct
+		INNER JOIN companies c ON ct.company_id = c.company_id
+		ORDER BY %s %s, ct.last_name ASC, ct.first_name ASC`, sortCol, strings.ToUpper(order))
+
+	rows, err := h.dbConn.QueryContext(r.Context(), query)
 	if err != nil {
 		http.Error(w, "Failed to fetch contacts", http.StatusInternalServerError)
 		return
 	}
+	defer rows.Close()
 
-	templates.ContactsList(contacts).Render(r.Context(), w)
+	var contacts []db.ListContactsWithCompanyRow
+	for rows.Next() {
+		var contact db.ListContactsWithCompanyRow
+		err := rows.Scan(
+			&contact.ContactID,
+			&contact.CompanyID,
+			&contact.FirstName,
+			&contact.LastName,
+			&contact.Role,
+			&contact.Email,
+			&contact.Phone,
+			&contact.Linkedin,
+			&contact.Notes,
+			&contact.CreatedAt,
+			&contact.UpdatedAt,
+			&contact.CompanyName,
+		)
+		if err != nil {
+			http.Error(w, "Failed to scan contacts", http.StatusInternalServerError)
+			return
+		}
+		contacts = append(contacts, contact)
+	}
+
+	templates.ContactsList(contacts, sortBy, order).Render(r.Context(), w)
 }
 
 func (h *ContactsHandler) New(w http.ResponseWriter, r *http.Request) {

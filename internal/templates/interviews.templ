@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-templ InterviewsList(interviews []db.ListInterviewsWithRoleRow) {
+templ InterviewsList(interviews []db.ListInterviewsWithRoleRow, sortBy, order string) {
 	@Layout("Interviews") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -24,9 +24,19 @@ templ InterviewsList(interviews []db.ListInterviewsWithRoleRow) {
 					<table class="min-w-full divide-y divide-gray-300 border border-gray-300">
 						<thead class="bg-gray-50">
 							<tr class="divide-x divide-gray-200">
-								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Company Name</th>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "company_name")) } class="group inline-flex hover:text-indigo-600">
+										Company Name
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "company_name") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role Name</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Date</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "date")) } class="group inline-flex hover:text-indigo-600">
+										Date
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "date") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Start</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">End</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>

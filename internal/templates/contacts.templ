@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-templ ContactsList(contacts []db.ListContactsWithCompanyRow) {
+templ ContactsList(contacts []db.ListContactsWithCompanyRow, sortBy, order string) {
 	@Layout("Contacts") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -24,9 +24,24 @@ templ ContactsList(contacts []db.ListContactsWithCompanyRow) {
 					<table class="min-w-full divide-y divide-gray-300 border border-gray-300">
 						<thead class="bg-gray-50">
 							<tr class="divide-x divide-gray-200">
-								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Company Name</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">First Name</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Last Name</th>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "company_name")) } class="group inline-flex hover:text-indigo-600">
+										Company Name
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "company_name") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "first_name")) } class="group inline-flex hover:text-indigo-600">
+										First Name
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "first_name") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "last_name")) } class="group inline-flex hover:text-indigo-600">
+										Last Name
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "last_name") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Email</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Phone</th>

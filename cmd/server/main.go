@@ -29,10 +29,10 @@ func main() {
 	queries := db.New(dbConn)
 
 	// Create handlers
-	companiesHandler := handlers.NewCompaniesHandler(queries)
-	rolesHandler := handlers.NewRolesHandler(queries)
-	interviewsHandler := handlers.NewInterviewsHandler(queries)
-	contactsHandler := handlers.NewContactsHandler(queries)
+	companiesHandler := handlers.NewCompaniesHandler(queries, dbConn)
+	rolesHandler := handlers.NewRolesHandler(queries, dbConn)
+	interviewsHandler := handlers.NewInterviewsHandler(queries, dbConn)
+	contactsHandler := handlers.NewContactsHandler(queries, dbConn)
 
 	// Setup routes
 	mux := http.NewServeMux()

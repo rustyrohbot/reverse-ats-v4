@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-templ RolesList(roles []db.ListRolesWithCompanyRow) {
+templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 	@Layout("Roles") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -24,21 +24,66 @@ templ RolesList(roles []db.ListRolesWithCompanyRow) {
 					<table class="min-w-full divide-y divide-gray-300 text-xs border border-gray-300">
 						<thead class="bg-gray-50">
 							<tr class="divide-x divide-gray-200">
-								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Company Name</th>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "company_name")) } class="group inline-flex hover:text-indigo-600">
+										Company Name
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "company_name") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">URL</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900" style="min-width: 500px; max-width: 600px;">Description</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900" style="min-width: 500px; max-width: 600px;">Cover Letter</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application Location</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Applied Date</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Closed Date</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Posted Range Min</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Posted Range Max</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "applied_date")) } class="group inline-flex hover:text-indigo-600">
+										Applied Date
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "applied_date") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "closed_date")) } class="group inline-flex hover:text-indigo-600">
+										Closed Date
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "closed_date") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "posted_range_min")) } class="group inline-flex hover:text-indigo-600">
+										Posted Min
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "posted_range_min") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "posted_range_max")) } class="group inline-flex hover:text-indigo-600">
+										Posted Max
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "posted_range_max") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Equity</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Work City</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Work State</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "work_city")) } class="group inline-flex hover:text-indigo-600">
+										Work City
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "work_city") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "work_state")) } class="group inline-flex hover:text-indigo-600">
+										Work State
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "work_state") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "location")) } class="group inline-flex hover:text-indigo-600">
+										Location
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "location") }</span>
+									</a>
+								</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "status")) } class="group inline-flex hover:text-indigo-600">
+										Status
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "status") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Discovery</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Referral</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900" style="min-width: 500px; max-width: 600px;">Notes</th>

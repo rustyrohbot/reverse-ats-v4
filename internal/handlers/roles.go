@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,20 +13,110 @@ import (
 
 type RolesHandler struct {
 	queries *db.Queries
+	dbConn  *sql.DB
 }
 
-func NewRolesHandler(queries *db.Queries) *RolesHandler {
-	return &RolesHandler{queries: queries}
+func NewRolesHandler(queries *db.Queries, dbConn *sql.DB) *RolesHandler {
+	return &RolesHandler{queries: queries, dbConn: dbConn}
 }
 
 func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) {
-	roles, err := h.queries.ListRolesWithCompany(r.Context())
+	sortBy := r.URL.Query().Get("sort")
+	order := r.URL.Query().Get("order")
+
+	// Map display names to actual column/field names
+	sortColumnMap := map[string]string{
+		"company_name":      "c.name",
+		"applied_date":      "r.applied_date",
+		"closed_date":       "r.closed_date",
+		"posted_range_min":  "r.posted_range_min",
+		"posted_range_max":  "r.posted_range_max",
+		"work_city":         "r.work_city",
+		"work_state":        "r.work_state",
+		"location":          "r.location",
+		"status":            "r.status",
+	}
+
+	sortCol, ok := sortColumnMap[sortBy]
+	if !ok {
+		sortBy = "applied_date"
+		sortCol = "r.applied_date"
+	}
+
+	if order != "asc" && order != "desc" {
+		order = "desc"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			r.role_id,
+			r.company_id,
+			r.name as role_name,
+			r.url,
+			r.description,
+			r.cover_letter,
+			r.application_location,
+			r.applied_date,
+			r.closed_date,
+			r.posted_range_min,
+			r.posted_range_max,
+			r.equity,
+			r.work_city,
+			r.work_state,
+			r.location,
+			r.status,
+			r.discovery,
+			r.referral,
+			r.notes,
+			r.created_at,
+			r.updated_at,
+			c.name as company_name
+		FROM roles r
+		INNER JOIN companies c ON r.company_id = c.company_id
+		ORDER BY %s %s`, sortCol, strings.ToUpper(order))
+
+	rows, err := h.dbConn.QueryContext(r.Context(), query)
 	if err != nil {
 		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
 		return
 	}
+	defer rows.Close()
 
-	templates.RolesList(roles).Render(r.Context(), w)
+	var roles []db.ListRolesWithCompanyRow
+	for rows.Next() {
+		var role db.ListRolesWithCompanyRow
+		err := rows.Scan(
+			&role.RoleID,
+			&role.CompanyID,
+			&role.RoleName,
+			&role.Url,
+			&role.Description,
+			&role.CoverLetter,
+			&role.ApplicationLocation,
+			&role.AppliedDate,
+			&role.ClosedDate,
+			&role.PostedRangeMin,
+			&role.PostedRangeMax,
+			&role.Equity,
+			&role.WorkCity,
+			&role.WorkState,
+			&role.Location,
+			&role.Status,
+			&role.Discovery,
+			&role.Referral,
+			&role.Notes,
+			&role.CreatedAt,
+			&role.UpdatedAt,
+			&role.CompanyName,
+		)
+		if err != nil {
+			http.Error(w, "Failed to scan roles", http.StatusInternalServerError)
+			return
+		}
+		roles = append(roles, role)
+	}
+
+	templates.RolesList(roles, sortBy, order).Render(r.Context(), w)
 }
 
 func (h *RolesHandler) New(w http.ResponseWriter, r *http.Request) {

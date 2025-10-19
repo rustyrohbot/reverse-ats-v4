@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,20 +13,61 @@ import (
 
 type CompaniesHandler struct {
 	queries *db.Queries
+	dbConn  *sql.DB
 }
 
-func NewCompaniesHandler(queries *db.Queries) *CompaniesHandler {
-	return &CompaniesHandler{queries: queries}
+func NewCompaniesHandler(queries *db.Queries, dbConn *sql.DB) *CompaniesHandler {
+	return &CompaniesHandler{queries: queries, dbConn: dbConn}
 }
 
 func (h *CompaniesHandler) List(w http.ResponseWriter, r *http.Request) {
-	companies, err := h.queries.ListCompanies(r.Context())
+	sortBy := r.URL.Query().Get("sort")
+	order := r.URL.Query().Get("order")
+
+	// Validate sort column
+	validSortColumns := map[string]bool{
+		"name":     true,
+		"hq_city":  true,
+		"hq_state": true,
+	}
+
+	if sortBy == "" || !validSortColumns[sortBy] {
+		sortBy = "name"
+	}
+
+	if order != "asc" && order != "desc" {
+		order = "asc"
+	}
+
+	query := fmt.Sprintf("SELECT * FROM companies ORDER BY %s %s", sortBy, strings.ToUpper(order))
+	rows, err := h.dbConn.QueryContext(r.Context(), query)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
 		return
 	}
+	defer rows.Close()
 
-	templates.CompaniesList(companies).Render(r.Context(), w)
+	var companies []db.Company
+	for rows.Next() {
+		var c db.Company
+		err := rows.Scan(
+			&c.CompanyID,
+			&c.Name,
+			&c.Description,
+			&c.Url,
+			&c.HqCity,
+			&c.HqState,
+			&c.CreatedAt,
+			&c.UpdatedAt,
+		)
+		if err != nil {
+			http.Error(w, "Failed to scan companies", http.StatusInternalServerError)
+			return
+		}
+		companies = append(companies, c)
+	}
+
+	templates.CompaniesList(companies, sortBy, order).Render(r.Context(), w)
 }
 
 func (h *CompaniesHandler) New(w http.ResponseWriter, r *http.Request) {
