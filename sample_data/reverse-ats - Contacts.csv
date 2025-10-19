@@ -1,0 +1,10 @@
+company_id,first_name,last_name,email,phone,linkedin,notes
+1,Sarah,Johnson,sarah.johnson@techcorp.example.com,415-555-0123,https://linkedin.com/in/sarahjohnson,Recruiter - very responsive and helpful
+1,Michael,Chen,michael.chen@techcorp.example.com,,https://linkedin.com/in/michaelchen,Engineering Manager - conducted technical interview
+2,Emily,Rodriguez,emily.r@datasystems.example.com,206-555-0145,https://linkedin.com/in/emilyrodriguez,Data Engineering Lead
+3,David,Kumar,d.kumar@cloudnet.example.com,512-555-0167,,Senior DevOps Engineer - referred by John Smith
+4,Jessica,Taylor,jess@startuplabs.example.com,,https://linkedin.com/in/jessicataylor,CTO - interviewed with her
+5,Jane,Doe,jane.doe@fintech.example.com,212-555-0189,https://linkedin.com/in/janedoe,Friend from previous company - provided referral
+6,Robert,Williams,rob.williams@devtools.example.com,503-555-0134,https://linkedin.com/in/robertwilliams,VP Engineering - great conversation about product vision
+7,Lisa,Anderson,lisa@airesearch.example.com,,https://linkedin.com/in/lisaanderson,Research Scientist - connected at conference
+8,James,Martinez,james.martinez@securenet.example.com,720-555-0156,https://linkedin.com/in/jamesmartinez,Security Architect - reached out on LinkedIn

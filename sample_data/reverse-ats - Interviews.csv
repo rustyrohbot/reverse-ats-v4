@@ -1,0 +1,8 @@
+role_id,date,start,end,type,notes
+1,2025-01-22,10:00,10:30,RECRUITER,Initial phone screen with Sarah from recruiting. Discussed background and interest in the role. Positive conversation.
+3,2025-01-25,14:00,15:00,TECH_SCREEN,Technical screen with senior engineer. Covered system design and Go concurrency patterns. Went well, moving to next round.
+5,2025-01-28,11:00,12:00,MANAGER,Interview with engineering manager. Discussed team dynamics, project roadmap, and leadership style.
+5,2025-02-02,09:00,13:00,LOOP,Full interview loop with 4 team members. Covered coding, system design, behavioral, and culture fit. Challenging but interesting.
+6,2025-01-30,15:30,16:00,RECRUITER,Quick call with recruiter to discuss role details and compensation expectations.
+8,2025-01-26,13:00,13:45,TECH_SCREEN,Security-focused technical interview. Discussed threat modeling and incident response experience.
+1,2025-02-05,10:00,11:30,MANAGER,Second round with hiring manager. Deep dive into past projects and technical approach.

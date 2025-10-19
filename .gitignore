@@ -43,5 +43,5 @@ static/output.css
 # Air (live reload)
 tmp/
 
-# Data files
-*.csv
+# User data files (keep sample_data/)
+data/

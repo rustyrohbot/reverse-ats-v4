@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -12,21 +11,20 @@ import (
 )
 
 func main() {
-	// Parse command line flags
-	csvDir := flag.String("dir", ".", "Directory containing CSV files")
-	dbPath := flag.String("db", "./data.db", "Path to SQLite database")
-	flag.Parse()
+	// Fixed paths
+	csvDir := "./data"
+	dbPath := "./data.db"
 
 	// Check if directory exists
-	if _, err := os.Stat(*csvDir); os.IsNotExist(err) {
-		log.Fatalf("Directory does not exist: %s", *csvDir)
+	if _, err := os.Stat(csvDir); os.IsNotExist(err) {
+		log.Fatalf("Directory does not exist: %s", csvDir)
 	}
 
-	fmt.Printf("Importing CSV files from: %s\n", *csvDir)
-	fmt.Printf("Database: %s\n\n", *dbPath)
+	fmt.Printf("Importing CSV files from: %s\n", csvDir)
+	fmt.Printf("Database: %s\n\n", dbPath)
 
 	// Connect to database
-	dbConn, err := database.New(*dbPath)
+	dbConn, err := database.New(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -36,7 +34,7 @@ func main() {
 	queries := db.New(dbConn)
 
 	// Import all CSV files
-	if err := importer.ImportAll(queries, *csvDir); err != nil {
+	if err := importer.ImportAll(queries, csvDir); err != nil {
 		log.Fatalf("Import failed: %v", err)
 	}
 }
