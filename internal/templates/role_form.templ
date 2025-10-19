@@ -1,0 +1,297 @@
+package templates
+
+import (
+	"reverse-ats/internal/db"
+	"fmt"
+)
+
+templ RoleFormNew(companies []db.Company) {
+	@Layout("New Role") {
+		@roleFormFields(nil, companies, false)
+	}
+}
+
+templ RoleFormEdit(role db.Role, companies []db.Company) {
+	@Layout("Edit Role") {
+		@roleFormFields(&role, companies, true)
+	}
+}
+
+templ roleFormFields(role *db.Role, companies []db.Company, isEdit bool) {
+	<div class="max-w-4xl mx-auto">
+		<div class="mb-6">
+			<h1 class="text-2xl font-semibold text-gray-900">
+				if isEdit {
+					Edit Role
+				} else {
+					New Role
+				}
+			</h1>
+		</div>
+		<form
+			if isEdit {
+				hx-put={ fmt.Sprintf("/roles/%d", role.RoleID) }
+			} else {
+				hx-post="/roles"
+			}
+			hx-target="body"
+			class="space-y-6 bg-white shadow-sm rounded-lg p-6"
+		>
+			<div class="grid grid-cols-2 gap-4">
+				<div>
+					<label for="company_id" class="block text-sm font-medium text-gray-700">Company *</label>
+					<select
+						id="company_id"
+						name="company_id"
+						required
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					>
+						<option value="">Select a company</option>
+						for _, company := range companies {
+							<option
+								value={ fmt.Sprintf("%d", company.CompanyID) }
+								if role != nil && role.CompanyID == company.CompanyID {
+									selected
+								}
+							>
+								{ company.Name }
+							</option>
+						}
+					</select>
+				</div>
+				<div>
+					<label for="name" class="block text-sm font-medium text-gray-700">Role Name *</label>
+					<input
+						type="text"
+						id="name"
+						name="name"
+						required
+						if role != nil {
+							value={ role.Name }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+			</div>
+			<div>
+				<label for="url" class="block text-sm font-medium text-gray-700">URL</label>
+				<input
+					type="url"
+					id="url"
+					name="url"
+					if role != nil && role.Url.Valid {
+						value={ role.Url.String }
+					}
+					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+				/>
+			</div>
+			<div>
+				<label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+				<textarea
+					id="description"
+					name="description"
+					rows="4"
+					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+				>
+					if role != nil && role.Description.Valid {
+						{ role.Description.String }
+					}
+				</textarea>
+			</div>
+			<div>
+				<label for="cover_letter" class="block text-sm font-medium text-gray-700">Cover Letter</label>
+				<textarea
+					id="cover_letter"
+					name="cover_letter"
+					rows="6"
+					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+				>
+					if role != nil && role.CoverLetter.Valid {
+						{ role.CoverLetter.String }
+					}
+				</textarea>
+			</div>
+			<div class="grid grid-cols-3 gap-4">
+				<div>
+					<label for="application_location" class="block text-sm font-medium text-gray-700">Application Location</label>
+					<input
+						type="text"
+						id="application_location"
+						name="application_location"
+						if role != nil && role.ApplicationLocation.Valid {
+							value={ role.ApplicationLocation.String }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+				<div>
+					<label for="applied_date" class="block text-sm font-medium text-gray-700">Applied Date</label>
+					<input
+						type="date"
+						id="applied_date"
+						name="applied_date"
+						if role != nil && role.AppliedDate.Valid {
+							value={ role.AppliedDate.String }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+				<div>
+					<label for="closed_date" class="block text-sm font-medium text-gray-700">Closed Date</label>
+					<input
+						type="date"
+						id="closed_date"
+						name="closed_date"
+						if role != nil && role.ClosedDate.Valid {
+							value={ role.ClosedDate.String }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 gap-4">
+				<div>
+					<label for="posted_range_min" class="block text-sm font-medium text-gray-700">Min Salary (k)</label>
+					<input
+						type="number"
+						id="posted_range_min"
+						name="posted_range_min"
+						if role != nil && role.PostedRangeMin.Valid {
+							value={ fmt.Sprintf("%d", role.PostedRangeMin.Int64) }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+				<div>
+					<label for="posted_range_max" class="block text-sm font-medium text-gray-700">Max Salary (k)</label>
+					<input
+						type="number"
+						id="posted_range_max"
+						name="posted_range_max"
+						if role != nil && role.PostedRangeMax.Valid {
+							value={ fmt.Sprintf("%d", role.PostedRangeMax.Int64) }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+				<div>
+					<label for="equity" class="block text-sm font-medium text-gray-700">Equity</label>
+					<input
+						type="text"
+						id="equity"
+						name="equity"
+						if role != nil && role.Equity.Valid {
+							value={ role.Equity.String }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 gap-4">
+				<div>
+					<label for="work_city" class="block text-sm font-medium text-gray-700">Work City</label>
+					<input
+						type="text"
+						id="work_city"
+						name="work_city"
+						if role != nil && role.WorkCity.Valid {
+							value={ role.WorkCity.String }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+				<div>
+					<label for="work_state" class="block text-sm font-medium text-gray-700">Work State</label>
+					<input
+						type="text"
+						id="work_state"
+						name="work_state"
+						if role != nil && role.WorkState.Valid {
+							value={ role.WorkState.String }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+				<div>
+					<label for="location" class="block text-sm font-medium text-gray-700">Location Type</label>
+					<select
+						id="location"
+						name="location"
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					>
+						<option value="">Select...</option>
+						<option value="Remote" if role != nil && role.Location.Valid && role.Location.String == "Remote" { selected }>Remote</option>
+						<option value="Hybrid" if role != nil && role.Location.Valid && role.Location.String == "Hybrid" { selected }>Hybrid</option>
+						<option value="On-site" if role != nil && role.Location.Valid && role.Location.String == "On-site" { selected }>On-site</option>
+					</select>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 gap-4">
+				<div>
+					<label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+					<select
+						id="status"
+						name="status"
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					>
+						<option value="">Select...</option>
+						<option value="Applied" if role != nil && role.Status.Valid && role.Status.String == "Applied" { selected }>Applied</option>
+						<option value="Interviewing" if role != nil && role.Status.Valid && role.Status.String == "Interviewing" { selected }>Interviewing</option>
+						<option value="Offer" if role != nil && role.Status.Valid && role.Status.String == "Offer" { selected }>Offer</option>
+						<option value="Rejected" if role != nil && role.Status.Valid && role.Status.String == "Rejected" { selected }>Rejected</option>
+						<option value="Withdrawn" if role != nil && role.Status.Valid && role.Status.String == "Withdrawn" { selected }>Withdrawn</option>
+					</select>
+				</div>
+				<div>
+					<label for="discovery" class="block text-sm font-medium text-gray-700">Discovery</label>
+					<input
+						type="text"
+						id="discovery"
+						name="discovery"
+						if role != nil && role.Discovery.Valid {
+							value={ role.Discovery.String }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+				<div>
+					<label for="referral" class="block text-sm font-medium text-gray-700">Referral</label>
+					<input
+						type="text"
+						id="referral"
+						name="referral"
+						if role != nil && role.Referral.Valid {
+							value={ role.Referral.String }
+						}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+					/>
+				</div>
+			</div>
+			<div>
+				<label for="notes" class="block text-sm font-medium text-gray-700">Notes</label>
+				<textarea
+					id="notes"
+					name="notes"
+					rows="3"
+					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+				>
+					if role != nil && role.Notes.Valid {
+						{ role.Notes.String }
+					}
+				</textarea>
+			</div>
+			<div class="flex justify-end space-x-3">
+				<a href="/roles" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+					Cancel
+				</a>
+				<button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+					if isEdit {
+						Update Role
+					} else {
+						Create Role
+					}
+				</button>
+			</div>
+		</form>
+	</div>
+}

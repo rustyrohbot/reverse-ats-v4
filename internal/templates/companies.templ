@@ -1,0 +1,96 @@
+package templates
+
+import (
+	"reverse-ats/internal/db"
+	"fmt"
+)
+
+templ CompaniesList(companies []db.Company) {
+	@Layout("Companies") {
+		<div class="sm:flex sm:items-center mb-6">
+			<div class="sm:flex-auto">
+				<h1 class="text-2xl font-semibold text-gray-900">Companies</h1>
+				<p class="mt-2 text-sm text-gray-700">{ fmt.Sprintf("%d companies tracked", len(companies)) }</p>
+			</div>
+			<div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+				<a href="/companies/new" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 inline-block">
+					Add company
+				</a>
+			</div>
+		</div>
+		<div class="mt-8 flow-root">
+			<div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+				<div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+					<table class="min-w-full divide-y divide-gray-300 border border-gray-300">
+						<thead class="bg-gray-50">
+							<tr class="divide-x divide-gray-200">
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Description</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">URL</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">HQ City</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">HQ State</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Actions</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-200 bg-white">
+							for _, company := range companies {
+								<tr class="hover:bg-gray-50 divide-x divide-gray-200">
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+										{ company.Name }
+									</td>
+									<td class="px-3 py-4 text-sm text-gray-500">
+										<div class="max-h-20 overflow-y-auto max-w-md">
+											if company.Description.Valid {
+												{ company.Description.String }
+											} else {
+												<span class="text-gray-400">—</span>
+											}
+										</div>
+									</td>
+									<td class="px-3 py-4 text-sm max-w-xs">
+										if company.Url.Valid {
+											<a href={ templ.SafeURL(company.Url.String) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+												{ company.Url.String }
+											</a>
+										} else {
+											<span class="text-gray-400">—</span>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+										if company.HqCity.Valid {
+											{ company.HqCity.String }
+										} else {
+											<span class="text-gray-400">—</span>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+										if company.HqState.Valid {
+											{ company.HqState.String }
+										} else {
+											<span class="text-gray-400">—</span>
+										}
+									</td>
+									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+										<a href={ templ.SafeURL(fmt.Sprintf("/companies/%d/edit", company.CompanyID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+											Edit
+										</a>
+										<button
+											hx-delete={ fmt.Sprintf("/companies/%d", company.CompanyID) }
+											hx-confirm="Are you sure you want to delete this company?"
+											hx-target="body"
+											class="text-red-600 hover:text-red-900"
+										>
+											Delete
+										</button>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	}
+}

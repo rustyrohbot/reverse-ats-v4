@@ -1,0 +1,116 @@
+package templates
+
+import (
+	"reverse-ats/internal/db"
+	"fmt"
+)
+
+templ ContactsList(contacts []db.ListContactsWithCompanyRow) {
+	@Layout("Contacts") {
+		<div class="sm:flex sm:items-center mb-6">
+			<div class="sm:flex-auto">
+				<h1 class="text-2xl font-semibold text-gray-900">Contacts</h1>
+				<p class="mt-2 text-sm text-gray-700">Recruiters and hiring managers you've connected with.</p>
+			</div>
+			<div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+				<a href="/contacts/new" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 inline-block">
+					Add contact
+				</a>
+			</div>
+		</div>
+		<div class="mt-8 flow-root">
+			<div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+				<div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+					<table class="min-w-full divide-y divide-gray-300 border border-gray-300">
+						<thead class="bg-gray-50">
+							<tr class="divide-x divide-gray-200">
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Company Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">First Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Last Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Email</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Phone</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">LinkedIn</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Notes</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Actions</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-200 bg-white">
+							for _, contact := range contacts {
+								<tr class="hover:bg-gray-50 divide-x divide-gray-200">
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-6">
+										{ contact.CompanyName }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+										{ contact.FirstName }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+										{ contact.LastName }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+										if contact.Role.Valid {
+											{ contact.Role.String }
+										} else {
+											<span class="text-gray-400">—</span>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+										if contact.Email.Valid {
+											<a href={ templ.SafeURL("mailto:" + contact.Email.String) } class="text-indigo-600 hover:text-indigo-900">
+												{ contact.Email.String }
+											</a>
+										} else {
+											<span class="text-gray-400">—</span>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+										if contact.Phone.Valid {
+											<a href={ templ.SafeURL("tel:" + contact.Phone.String) } class="text-indigo-600 hover:text-indigo-900">
+												{ contact.Phone.String }
+											</a>
+										} else {
+											<span class="text-gray-400">—</span>
+										}
+									</td>
+									<td class="px-3 py-4 text-sm max-w-xs">
+										if contact.Linkedin.Valid {
+											<a href={ templ.SafeURL(contact.Linkedin.String) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+												{ contact.Linkedin.String }
+											</a>
+										} else {
+											<span class="text-gray-400">—</span>
+										}
+									</td>
+									<td class="px-3 py-4 text-sm text-gray-500">
+										<div class="max-h-20 overflow-y-auto max-w-md">
+											if contact.Notes.Valid {
+												{ contact.Notes.String }
+											} else {
+												<span class="text-gray-400">—</span>
+											}
+										</div>
+									</td>
+									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+										<a href={ templ.SafeURL(fmt.Sprintf("/contacts/%d/edit", contact.ContactID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+											Edit
+										</a>
+										<button
+											hx-delete={ fmt.Sprintf("/contacts/%d", contact.ContactID) }
+											hx-confirm="Are you sure you want to delete this contact?"
+											hx-target="body"
+											class="text-red-600 hover:text-red-900"
+										>
+											Delete
+										</button>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	}
+}

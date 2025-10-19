@@ -1,0 +1,90 @@
+package templates
+
+import (
+	"reverse-ats/internal/db"
+	"fmt"
+)
+
+templ InterviewsList(interviews []db.ListInterviewsWithRoleRow) {
+	@Layout("Interviews") {
+		<div class="sm:flex sm:items-center mb-6">
+			<div class="sm:flex-auto">
+				<h1 class="text-2xl font-semibold text-gray-900">Interviews</h1>
+				<p class="mt-2 text-sm text-gray-700">{ fmt.Sprintf("%d interviews scheduled", len(interviews)) }</p>
+			</div>
+			<div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+				<a href="/interviews/new" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 inline-block">
+					Add interview
+				</a>
+			</div>
+		</div>
+		<div class="mt-8 flow-root">
+			<div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+				<div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+					<table class="min-w-full divide-y divide-gray-300 border border-gray-300">
+						<thead class="bg-gray-50">
+							<tr class="divide-x divide-gray-200">
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Company Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Date</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Start</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">End</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Notes</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Actions</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-200 bg-white">
+							for _, interview := range interviews {
+								<tr class="hover:bg-gray-50 divide-x divide-gray-200">
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-6">
+										{ interview.CompanyName }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
+										{ interview.RoleName }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+										{ interview.Date }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+										{ interview.Start }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+										{ interview.End }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+										{ interview.Type }
+									</td>
+									<td class="px-3 py-4 text-sm text-gray-500">
+										<div class="max-h-20 overflow-y-auto max-w-md">
+											if interview.Notes.Valid {
+												{ interview.Notes.String }
+											} else {
+												<span class="text-gray-400">—</span>
+											}
+										</div>
+									</td>
+									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+										<a href={ templ.SafeURL(fmt.Sprintf("/interviews/%d/edit", interview.InterviewID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+											Edit
+										</a>
+										<button
+											hx-delete={ fmt.Sprintf("/interviews/%d", interview.InterviewID) }
+											hx-confirm="Are you sure you want to delete this interview?"
+											hx-target="body"
+											class="text-red-600 hover:text-red-900"
+										>
+											Delete
+										</button>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	}
+}

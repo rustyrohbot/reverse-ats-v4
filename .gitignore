@@ -1,0 +1,47 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+vendor/
+
+# Generated files
+internal/db/
+*_templ.go
+
+# Node modules (for Tailwind)
+node_modules/
+
+# Built CSS
+static/output.css
+
+# Air (live reload)
+tmp/
+
+# Data files
+*.csv
