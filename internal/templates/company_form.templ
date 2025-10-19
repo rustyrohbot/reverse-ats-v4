@@ -90,15 +90,14 @@ templ companyFormFields(company *db.Company, isEdit bool) {
 				</div>
 				<div>
 					<label for="hq_state" class="block text-sm font-medium text-gray-700">HQ State</label>
-					<input
-						type="text"
+					<select
 						id="hq_state"
 						name="hq_state"
-						if company != nil && company.HqState.Valid {
-							value={ company.HqState.String }
-						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
-					/>
+					>
+						<option value="">Select...</option>
+						@stateOptions(company)
+					</select>
 				</div>
 			</div>
 			<div class="flex justify-end space-x-3">
@@ -115,4 +114,58 @@ templ companyFormFields(company *db.Company, isEdit bool) {
 			</div>
 		</form>
 	</div>
+}
+
+templ stateOptions(company *db.Company) {
+	<option value="AL" if company != nil && company.HqState.Valid && company.HqState.String == "AL" { selected }>AL - Alabama</option>
+	<option value="AK" if company != nil && company.HqState.Valid && company.HqState.String == "AK" { selected }>AK - Alaska</option>
+	<option value="AZ" if company != nil && company.HqState.Valid && company.HqState.String == "AZ" { selected }>AZ - Arizona</option>
+	<option value="AR" if company != nil && company.HqState.Valid && company.HqState.String == "AR" { selected }>AR - Arkansas</option>
+	<option value="CA" if company != nil && company.HqState.Valid && company.HqState.String == "CA" { selected }>CA - California</option>
+	<option value="CO" if company != nil && company.HqState.Valid && company.HqState.String == "CO" { selected }>CO - Colorado</option>
+	<option value="CT" if company != nil && company.HqState.Valid && company.HqState.String == "CT" { selected }>CT - Connecticut</option>
+	<option value="DE" if company != nil && company.HqState.Valid && company.HqState.String == "DE" { selected }>DE - Delaware</option>
+	<option value="FL" if company != nil && company.HqState.Valid && company.HqState.String == "FL" { selected }>FL - Florida</option>
+	<option value="GA" if company != nil && company.HqState.Valid && company.HqState.String == "GA" { selected }>GA - Georgia</option>
+	<option value="HI" if company != nil && company.HqState.Valid && company.HqState.String == "HI" { selected }>HI - Hawaii</option>
+	<option value="ID" if company != nil && company.HqState.Valid && company.HqState.String == "ID" { selected }>ID - Idaho</option>
+	<option value="IL" if company != nil && company.HqState.Valid && company.HqState.String == "IL" { selected }>IL - Illinois</option>
+	<option value="IN" if company != nil && company.HqState.Valid && company.HqState.String == "IN" { selected }>IN - Indiana</option>
+	<option value="IA" if company != nil && company.HqState.Valid && company.HqState.String == "IA" { selected }>IA - Iowa</option>
+	<option value="KS" if company != nil && company.HqState.Valid && company.HqState.String == "KS" { selected }>KS - Kansas</option>
+	<option value="KY" if company != nil && company.HqState.Valid && company.HqState.String == "KY" { selected }>KY - Kentucky</option>
+	<option value="LA" if company != nil && company.HqState.Valid && company.HqState.String == "LA" { selected }>LA - Louisiana</option>
+	<option value="ME" if company != nil && company.HqState.Valid && company.HqState.String == "ME" { selected }>ME - Maine</option>
+	<option value="MD" if company != nil && company.HqState.Valid && company.HqState.String == "MD" { selected }>MD - Maryland</option>
+	<option value="MA" if company != nil && company.HqState.Valid && company.HqState.String == "MA" { selected }>MA - Massachusetts</option>
+	<option value="MI" if company != nil && company.HqState.Valid && company.HqState.String == "MI" { selected }>MI - Michigan</option>
+	<option value="MN" if company != nil && company.HqState.Valid && company.HqState.String == "MN" { selected }>MN - Minnesota</option>
+	<option value="MS" if company != nil && company.HqState.Valid && company.HqState.String == "MS" { selected }>MS - Mississippi</option>
+	<option value="MO" if company != nil && company.HqState.Valid && company.HqState.String == "MO" { selected }>MO - Missouri</option>
+	<option value="MT" if company != nil && company.HqState.Valid && company.HqState.String == "MT" { selected }>MT - Montana</option>
+	<option value="NE" if company != nil && company.HqState.Valid && company.HqState.String == "NE" { selected }>NE - Nebraska</option>
+	<option value="NV" if company != nil && company.HqState.Valid && company.HqState.String == "NV" { selected }>NV - Nevada</option>
+	<option value="NH" if company != nil && company.HqState.Valid && company.HqState.String == "NH" { selected }>NH - New Hampshire</option>
+	<option value="NJ" if company != nil && company.HqState.Valid && company.HqState.String == "NJ" { selected }>NJ - New Jersey</option>
+	<option value="NM" if company != nil && company.HqState.Valid && company.HqState.String == "NM" { selected }>NM - New Mexico</option>
+	<option value="NY" if company != nil && company.HqState.Valid && company.HqState.String == "NY" { selected }>NY - New York</option>
+	<option value="NC" if company != nil && company.HqState.Valid && company.HqState.String == "NC" { selected }>NC - North Carolina</option>
+	<option value="ND" if company != nil && company.HqState.Valid && company.HqState.String == "ND" { selected }>ND - North Dakota</option>
+	<option value="OH" if company != nil && company.HqState.Valid && company.HqState.String == "OH" { selected }>OH - Ohio</option>
+	<option value="OK" if company != nil && company.HqState.Valid && company.HqState.String == "OK" { selected }>OK - Oklahoma</option>
+	<option value="OR" if company != nil && company.HqState.Valid && company.HqState.String == "OR" { selected }>OR - Oregon</option>
+	<option value="PA" if company != nil && company.HqState.Valid && company.HqState.String == "PA" { selected }>PA - Pennsylvania</option>
+	<option value="RI" if company != nil && company.HqState.Valid && company.HqState.String == "RI" { selected }>RI - Rhode Island</option>
+	<option value="SC" if company != nil && company.HqState.Valid && company.HqState.String == "SC" { selected }>SC - South Carolina</option>
+	<option value="SD" if company != nil && company.HqState.Valid && company.HqState.String == "SD" { selected }>SD - South Dakota</option>
+	<option value="TN" if company != nil && company.HqState.Valid && company.HqState.String == "TN" { selected }>TN - Tennessee</option>
+	<option value="TX" if company != nil && company.HqState.Valid && company.HqState.String == "TX" { selected }>TX - Texas</option>
+	<option value="UT" if company != nil && company.HqState.Valid && company.HqState.String == "UT" { selected }>UT - Utah</option>
+	<option value="VT" if company != nil && company.HqState.Valid && company.HqState.String == "VT" { selected }>VT - Vermont</option>
+	<option value="VA" if company != nil && company.HqState.Valid && company.HqState.String == "VA" { selected }>VA - Virginia</option>
+	<option value="WA" if company != nil && company.HqState.Valid && company.HqState.String == "WA" { selected }>WA - Washington</option>
+	<option value="WV" if company != nil && company.HqState.Valid && company.HqState.String == "WV" { selected }>WV - West Virginia</option>
+	<option value="WI" if company != nil && company.HqState.Valid && company.HqState.String == "WI" { selected }>WI - Wisconsin</option>
+	<option value="WY" if company != nil && company.HqState.Valid && company.HqState.String == "WY" { selected }>WY - Wyoming</option>
+	<option value="DC" if company != nil && company.HqState.Valid && company.HqState.String == "DC" { selected }>DC - District of Columbia</option>
 }
