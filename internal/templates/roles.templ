@@ -3,7 +3,93 @@ package templates
 import (
 	"reverse-ats/internal/db"
 	"fmt"
+	"time"
+	"strings"
 )
+
+// Helper function to get cell background color style based on date age
+func getDateCellStyle(dateStr string) string {
+	if dateStr == "" {
+		return "background-color: #f3f4f6;" // gray-100
+	}
+
+	// Parse "April 8, 2025" format
+	t, err := time.Parse("January 2, 2006", dateStr)
+	if err != nil {
+		return ""
+	}
+
+	daysSince := int(time.Since(t).Hours() / 24)
+	if daysSince > 30 {
+		return "background-color: #fdba74;" // orange-300
+	} else if daysSince > 7 {
+		return "background-color: #fed7aa;" // orange-200
+	}
+	return ""
+}
+
+// Helper function to get salary cell background color style
+func getSalaryCellStyle(salary int64) string {
+	if salary == 0 {
+		return "background-color: #f3f4f6;" // gray-100
+	}
+	if salary < 100000 {
+		return "background-color: #fecaca;" // red-200
+	} else if salary >= 200000 {
+		return "background-color: #86efac;" // green-300
+	} else if salary >= 150000 {
+		return "background-color: #bbf7d0;" // green-200
+	}
+	return ""
+}
+
+// Helper function to get location cell background color style
+func getLocationCellStyle(location string) string {
+	if location == "" {
+		return "background-color: #f3f4f6;" // gray-100
+	}
+	upper := strings.ToUpper(location)
+	switch upper {
+	case "REMOTE":
+		return "background-color: #bfdbfe;" // blue-200
+	case "HYBRID":
+		return "background-color: #bbf7d0;" // green-200
+	case "ON_SITE", "ONSITE":
+		return "background-color: #fecaca;" // red-200
+	default:
+		return ""
+	}
+}
+
+// Helper function to check if location is REMOTE for work city/state
+func getRemoteCellStyle(location string, valid bool) string {
+	if !valid {
+		return "background-color: #f3f4f6;" // gray-100
+	}
+	if strings.ToUpper(location) == "REMOTE" {
+		return "background-color: #bfdbfe;" // blue-200
+	}
+	return ""
+}
+
+// Helper function to get status cell background color style
+func getStatusCellStyle(status string) string {
+	if status == "" {
+		return "background-color: #f3f4f6;" // gray-100
+	}
+	if strings.ToUpper(status) == "REJECTED" {
+		return "background-color: #fecaca;" // red-200
+	}
+	return ""
+}
+
+// Helper function to check if value is null/empty
+func getNullCellStyle(valid bool) string {
+	if !valid {
+		return "background-color: #f3f4f6;" // gray-100
+	}
+	return ""
+}
 
 templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 	@Layout("Roles") {
@@ -110,7 +196,7 @@ templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="px-3 py-2 text-xs text-gray-500" style="min-width: 500px; max-width: 600px;">
+									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.Description.Valid) }>
 										<div class="max-h-20 overflow-y-auto">
 											if role.Description.Valid {
 												{ role.Description.String }
@@ -119,7 +205,7 @@ templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 											}
 										</div>
 									</td>
-									<td class="px-3 py-2 text-xs text-gray-500" style="min-width: 500px; max-width: 600px;">
+									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.CoverLetter.Valid) }>
 										<div class="max-h-20 overflow-y-auto">
 											if role.CoverLetter.Valid {
 												{ role.CoverLetter.String }
@@ -128,91 +214,91 @@ templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 											}
 										</div>
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.ApplicationLocation.Valid) }>
 										if role.ApplicationLocation.Valid {
 											{ role.ApplicationLocation.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getDateCellStyle(role.AppliedDate.String) }>
 										if role.AppliedDate.Valid {
 											{ role.AppliedDate.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.ClosedDate.Valid) }>
 										if role.ClosedDate.Valid {
 											{ role.ClosedDate.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getSalaryCellStyle(role.PostedRangeMin.Int64) }>
 										if role.PostedRangeMin.Valid {
-											{ fmt.Sprintf("$%dk", role.PostedRangeMin.Int64) }
+											{ fmt.Sprintf("$%dk", role.PostedRangeMin.Int64/1000) }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getSalaryCellStyle(role.PostedRangeMax.Int64) }>
 										if role.PostedRangeMax.Valid {
-											{ fmt.Sprintf("$%dk", role.PostedRangeMax.Int64) }
+											{ fmt.Sprintf("$%dk", role.PostedRangeMax.Int64/1000) }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Equity.Valid) }>
 										if role.Equity.Valid {
 											{ role.Equity.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getRemoteCellStyle(role.Location.String, role.WorkCity.Valid) }>
 										if role.WorkCity.Valid {
 											{ role.WorkCity.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getRemoteCellStyle(role.Location.String, role.WorkState.Valid) }>
 										if role.WorkState.Valid {
 											{ role.WorkState.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getLocationCellStyle(role.Location.String) }>
 										if role.Location.Valid {
 											{ role.Location.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getStatusCellStyle(role.Status.String) }>
 										if role.Status.Valid {
 											{ role.Status.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Discovery.Valid) }>
 										if role.Discovery.Valid {
 											{ role.Discovery.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Referral.Valid) }>
 										if role.Referral.Valid {
 											{ role.Referral.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="px-3 py-2 text-xs text-gray-500" style="min-width: 500px; max-width: 600px;">
+									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.Notes.Valid) }>
 										<div class="max-h-20 overflow-y-auto">
 											if role.Notes.Valid {
 												{ role.Notes.String }
