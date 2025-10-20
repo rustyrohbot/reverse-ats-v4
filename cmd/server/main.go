@@ -34,6 +34,7 @@ func main() {
 	interviewsHandler := handlers.NewInterviewsHandler(queries, dbConn)
 	contactsHandler := handlers.NewContactsHandler(queries, dbConn)
 	statsHandler := handlers.NewStatsHandler(queries, dbConn)
+	exportHandler := handlers.NewExportHandler(queries, dbConn)
 
 	// Setup routes
 	mux := http.NewServeMux()
@@ -124,6 +125,9 @@ func main() {
 
 	// Stats route
 	mux.HandleFunc("/stats", statsHandler.Show)
+
+	// Export route
+	mux.HandleFunc("/export", exportHandler.Export)
 
 	// Start server
 	port := os.Getenv("PORT")
