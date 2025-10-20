@@ -1,0 +1,176 @@
+package templates
+
+import (
+	"fmt"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+)
+
+type StatsData struct {
+	RolesApplied         int
+	OffersReceived       int
+	Rejections           int
+	AvgPostedMin         float64
+	AvgPostedMax         float64
+	AbsPostedMin         int64
+	AbsPostedMax         int64
+	RemoteRoles          int
+	HybridRoles          int
+	OnsiteRoles          int
+	TotalInterviews      int
+	RecruiterInterviews  int
+	ManagerInterviews    int
+	LoopInterviews       int
+	TechScreenInterviews int
+	DateRange            string
+	StartDate            string
+	EndDate              string
+}
+
+templ Stats(stats StatsData) {
+	@Layout("Stats") {
+		<div class="max-w-7xl mx-auto">
+			<div class="sm:flex sm:items-center mb-6">
+				<div class="sm:flex-auto">
+					<h1 class="text-2xl font-semibold text-gray-900">Statistics</h1>
+					<p class="mt-2 text-sm text-gray-700">Job search metrics and insights</p>
+				</div>
+			</div>
+			<!-- Date Range Selector -->
+			<div class="bg-white shadow-sm rounded-lg p-6 mb-6">
+				<h2 class="text-lg font-semibold text-gray-900 mb-4">Date Range</h2>
+				<div class="flex flex-wrap gap-2 mb-4">
+					<a
+						href="/stats?range=7"
+						class={ "px-4 py-2 rounded-md text-sm font-medium", templ.KV("bg-indigo-600 text-white", stats.DateRange == "7"), templ.KV("bg-gray-200 text-gray-700 hover:bg-gray-300", stats.DateRange != "7") }
+					>
+						Last 7 Days
+					</a>
+					<a
+						href="/stats?range=30"
+						class={ "px-4 py-2 rounded-md text-sm font-medium", templ.KV("bg-indigo-600 text-white", stats.DateRange == "30"), templ.KV("bg-gray-200 text-gray-700 hover:bg-gray-300", stats.DateRange != "30") }
+					>
+						Last 30 Days
+					</a>
+					<a
+						href="/stats?range=90"
+						class={ "px-4 py-2 rounded-md text-sm font-medium", templ.KV("bg-indigo-600 text-white", stats.DateRange == "90"), templ.KV("bg-gray-200 text-gray-700 hover:bg-gray-300", stats.DateRange != "90") }
+					>
+						Last 90 Days
+					</a>
+					<a
+						href="/stats?range=180"
+						class={ "px-4 py-2 rounded-md text-sm font-medium", templ.KV("bg-indigo-600 text-white", stats.DateRange == "180"), templ.KV("bg-gray-200 text-gray-700 hover:bg-gray-300", stats.DateRange != "180") }
+					>
+						Last 180 Days
+					</a>
+					<a
+						href="/stats?range=365"
+						class={ "px-4 py-2 rounded-md text-sm font-medium", templ.KV("bg-indigo-600 text-white", stats.DateRange == "365"), templ.KV("bg-gray-200 text-gray-700 hover:bg-gray-300", stats.DateRange != "365") }
+					>
+						Last 365 Days
+					</a>
+					<a
+						href="/stats?range=all"
+						class={ "px-4 py-2 rounded-md text-sm font-medium", templ.KV("bg-indigo-600 text-white", stats.DateRange == "all"), templ.KV("bg-gray-200 text-gray-700 hover:bg-gray-300", stats.DateRange != "all") }
+					>
+						All Time
+					</a>
+				</div>
+				<!-- Custom Date Range -->
+				<form method="GET" action="/stats" class="flex items-end gap-4">
+					<input type="hidden" name="range" value="custom"/>
+					<div>
+						<label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+						<input
+							type="date"
+							id="start_date"
+							name="start_date"
+							value={ stats.StartDate }
+							class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+						/>
+					</div>
+					<div>
+						<label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+						<input
+							type="date"
+							id="end_date"
+							name="end_date"
+							value={ stats.EndDate }
+							class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+						/>
+					</div>
+					<button
+						type="submit"
+						class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500"
+					>
+						Apply
+					</button>
+				</form>
+			</div>
+			<!-- Metrics Grid -->
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+				<!-- Applications -->
+				@statTile("Roles Applied", fmt.Sprintf("%d", stats.RolesApplied), "Total applications submitted", "text-blue-600", "bg-blue-50")
+				<!-- Offers -->
+				@statTile("Offers Received", fmt.Sprintf("%d", stats.OffersReceived), "Job offers received", "text-green-600", "bg-green-50")
+				<!-- Rejections -->
+				@statTile("Rejections", fmt.Sprintf("%d", stats.Rejections), "Applications rejected", "text-red-600", "bg-red-50")
+				<!-- Average Posted Min -->
+				@statTile("Avg Salary Min", formatSalary(stats.AvgPostedMin), "Average minimum salary", "text-indigo-600", "bg-indigo-50")
+				<!-- Average Posted Max -->
+				@statTile("Avg Salary Max", formatSalary(stats.AvgPostedMax), "Average maximum salary", "text-indigo-600", "bg-indigo-50")
+				<!-- Absolute Posted Min -->
+				@statTile("Lowest Salary", formatInt(stats.AbsPostedMin), "Lowest posted minimum", "text-purple-600", "bg-purple-50")
+				<!-- Absolute Posted Max -->
+				@statTile("Highest Salary", formatInt(stats.AbsPostedMax), "Highest posted maximum", "text-purple-600", "bg-purple-50")
+				<!-- Remote Roles -->
+				@statTile("Remote Roles", fmt.Sprintf("%d", stats.RemoteRoles), "Fully remote positions", "text-teal-600", "bg-teal-50")
+				<!-- Hybrid Roles -->
+				@statTile("Hybrid Roles", fmt.Sprintf("%d", stats.HybridRoles), "Hybrid work positions", "text-cyan-600", "bg-cyan-50")
+				<!-- Onsite Roles -->
+				@statTile("Onsite Roles", fmt.Sprintf("%d", stats.OnsiteRoles), "Fully onsite positions", "text-orange-600", "bg-orange-50")
+				<!-- Total Interviews -->
+				@statTile("Total Interviews", fmt.Sprintf("%d", stats.TotalInterviews), "All interviews scheduled", "text-emerald-600", "bg-emerald-50")
+				<!-- Recruiter Interviews -->
+				@statTile("Recruiter Screens", fmt.Sprintf("%d", stats.RecruiterInterviews), "Initial recruiter calls", "text-sky-600", "bg-sky-50")
+				<!-- Tech Screen Interviews -->
+				@statTile("Tech Screens", fmt.Sprintf("%d", stats.TechScreenInterviews), "Technical screening rounds", "text-violet-600", "bg-violet-50")
+				<!-- Manager Interviews -->
+				@statTile("Manager Interviews", fmt.Sprintf("%d", stats.ManagerInterviews), "Hiring manager rounds", "text-fuchsia-600", "bg-fuchsia-50")
+				<!-- Loop Interviews -->
+				@statTile("Interview Loops", fmt.Sprintf("%d", stats.LoopInterviews), "Full interview loops", "text-rose-600", "bg-rose-50")
+			</div>
+		</div>
+	}
+}
+
+templ statTile(title, value, description, textColor, bgColor string) {
+	<div class={ "rounded-lg shadow-sm p-6", bgColor }>
+		<div class="flex items-center justify-between">
+			<div>
+				<p class="text-sm font-medium text-gray-600">{ title }</p>
+				<p class={ "text-3xl font-bold mt-2", textColor }>{ value }</p>
+				<p class="text-xs text-gray-500 mt-1">{ description }</p>
+			</div>
+		</div>
+	</div>
+}
+
+func formatSalary(val float64) string {
+	if val == 0 {
+		return "—"
+	}
+	// Format with commas: 130047 → $130,047
+	p := message.NewPrinter(language.English)
+	return p.Sprintf("$%.0f", val)
+}
+
+func formatInt(val int64) string {
+	if val == 0 {
+		return "—"
+	}
+	// Format with commas: 130047 → $130,047
+	p := message.NewPrinter(language.English)
+	return p.Sprintf("$%d", val)
+}

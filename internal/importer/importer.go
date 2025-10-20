@@ -21,11 +21,22 @@ func nullString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: true}
 }
 
-// nullInt64 converts string to sql.NullInt64
-func nullInt64(s string) sql.NullInt64 {
+// NullInt64 converts string to sql.NullInt64
+// Handles currency format like "$130,047.00"
+func NullInt64(s string) sql.NullInt64 {
 	if s == "" || s == "NULL" {
 		return sql.NullInt64{Valid: false}
 	}
+
+	// Remove currency symbols, commas, and decimal portions
+	s = strings.TrimPrefix(s, "$")
+	s = strings.ReplaceAll(s, ",", "")
+
+	// If there's a decimal point, take only the integer part
+	if idx := strings.Index(s, "."); idx != -1 {
+		s = s[:idx]
+	}
+
 	i, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return sql.NullInt64{Valid: false}
@@ -190,8 +201,8 @@ func ImportRoles(queries *db.Queries, filepath string) error {
 			ApplicationLocation: nullString(record[6]),
 			AppliedDate:         nullString(record[7]),
 			ClosedDate:          nullString(record[8]),
-			PostedRangeMin:      nullInt64(record[9]),
-			PostedRangeMax:      nullInt64(record[10]),
+			PostedRangeMin:      NullInt64(record[9]),
+			PostedRangeMax:      NullInt64(record[10]),
 			Equity:              nullString(record[11]),
 			WorkCity:            nullString(record[12]),
 			WorkState:           nullString(record[13]),

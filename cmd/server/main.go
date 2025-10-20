@@ -33,6 +33,7 @@ func main() {
 	rolesHandler := handlers.NewRolesHandler(queries, dbConn)
 	interviewsHandler := handlers.NewInterviewsHandler(queries, dbConn)
 	contactsHandler := handlers.NewContactsHandler(queries, dbConn)
+	statsHandler := handlers.NewStatsHandler(queries, dbConn)
 
 	// Setup routes
 	mux := http.NewServeMux()
@@ -120,6 +121,9 @@ func main() {
 			contactsHandler.Delete(w, r)
 		}
 	})
+
+	// Stats route
+	mux.HandleFunc("/stats", statsHandler.Show)
 
 	// Start server
 	port := os.Getenv("PORT")

@@ -23,7 +23,7 @@ A web application for tracking job applications, interviews, and contacts during
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd reverse-ats-v3
+cd reverse-ats-v4
 ```
 
 2. Install Go dependencies:
