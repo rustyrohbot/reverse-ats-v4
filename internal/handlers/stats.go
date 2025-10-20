@@ -115,6 +115,15 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 	h.dbConn.QueryRow(rejectionsQuery).Scan(&stats.Rejections)
 
+	// Query: Interviewing
+	var interviewingQuery string
+	if whereClause != "" {
+		interviewingQuery = "SELECT COUNT(*) FROM roles" + whereClause + " AND status = 'INTERVIEWING'"
+	} else {
+		interviewingQuery = "SELECT COUNT(*) FROM roles WHERE status = 'INTERVIEWING'"
+	}
+	h.dbConn.QueryRow(interviewingQuery).Scan(&stats.Interviewing)
+
 	// Query: Ghosted
 	var ghostedQuery string
 	if whereClause != "" {

@@ -10,6 +10,7 @@ type StatsData struct {
 	RolesApplied         int
 	OffersReceived       int
 	Rejections           int
+	Interviewing         int
 	Ghosted              int
 	Freeze               int
 	Withdrew             int
@@ -119,6 +120,8 @@ templ Stats(stats StatsData) {
 				@statTile("Offers Received", fmt.Sprintf("%d", stats.OffersReceived), "Job offers received", "text-green-600", "bg-green-50")
 				<!-- Rejections -->
 				@statTile("Rejections", fmt.Sprintf("%d", stats.Rejections), "Applications rejected", "text-red-600", "bg-red-50")
+				<!-- Interviewing -->
+				@statTile("Interviewing", fmt.Sprintf("%d", stats.Interviewing), "Currently in interview process", "text-blue-600", "bg-blue-50")
 				<!-- Ghosted -->
 				@statTile("Ghosted", fmt.Sprintf("%d", stats.Ghosted), "No response received", "text-gray-600", "bg-gray-50")
 				<!-- Freeze -->

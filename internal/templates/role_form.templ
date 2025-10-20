@@ -220,9 +220,9 @@ templ roleFormFields(role *db.Role, companies []db.Company, isEdit bool) {
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					>
 						<option value="">Select...</option>
-						<option value="Remote" if role != nil && role.Location.Valid && role.Location.String == "Remote" { selected }>Remote</option>
-						<option value="Hybrid" if role != nil && role.Location.Valid && role.Location.String == "Hybrid" { selected }>Hybrid</option>
-						<option value="On-site" if role != nil && role.Location.Valid && role.Location.String == "On-site" { selected }>On-site</option>
+						<option value="REMOTE" if role != nil && role.Location.Valid && role.Location.String == "REMOTE" { selected }>Remote</option>
+						<option value="HYBRID" if role != nil && role.Location.Valid && role.Location.String == "HYBRID" { selected }>Hybrid</option>
+						<option value="ONSITE" if role != nil && role.Location.Valid && role.Location.String == "ONSITE" { selected }>Onsite</option>
 					</select>
 				</div>
 			</div>
@@ -235,11 +235,14 @@ templ roleFormFields(role *db.Role, companies []db.Company, isEdit bool) {
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					>
 						<option value="">Select...</option>
-						<option value="Applied" if role != nil && role.Status.Valid && role.Status.String == "Applied" { selected }>Applied</option>
-						<option value="Interviewing" if role != nil && role.Status.Valid && role.Status.String == "Interviewing" { selected }>Interviewing</option>
-						<option value="Offer" if role != nil && role.Status.Valid && role.Status.String == "Offer" { selected }>Offer</option>
-						<option value="Rejected" if role != nil && role.Status.Valid && role.Status.String == "Rejected" { selected }>Rejected</option>
-						<option value="Withdrawn" if role != nil && role.Status.Valid && role.Status.String == "Withdrawn" { selected }>Withdrawn</option>
+						<option value="APPLIED" if role != nil && role.Status.Valid && role.Status.String == "APPLIED" { selected }>Applied</option>
+						<option value="REJECTED" if role != nil && role.Status.Valid && role.Status.String == "REJECTED" { selected }>Rejected</option>
+						<option value="INTERVIEWING" if role != nil && role.Status.Valid && role.Status.String == "INTERVIEWING" { selected }>Interviewing</option>
+						<option value="WITHDREW" if role != nil && role.Status.Valid && role.Status.String == "WITHDREW" { selected }>Withdrew</option>
+						<option value="GHOSTED" if role != nil && role.Status.Valid && role.Status.String == "GHOSTED" { selected }>Ghosted</option>
+						<option value="FREEZE" if role != nil && role.Status.Valid && role.Status.String == "FREEZE" { selected }>Freeze</option>
+						<option value="OFFER" if role != nil && role.Status.Valid && role.Status.String == "OFFER" { selected }>Offer</option>
+						<option value="RESEARCH" if role != nil && role.Status.Valid && role.Status.String == "RESEARCH" { selected }>Research</option>
 					</select>
 				</div>
 				<div>
