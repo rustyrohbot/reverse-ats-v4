@@ -10,6 +10,9 @@ type StatsData struct {
 	RolesApplied         int
 	OffersReceived       int
 	Rejections           int
+	Ghosted              int
+	Freeze               int
+	Withdrew             int
 	AvgPostedMin         float64
 	AvgPostedMax         float64
 	AbsPostedMin         int64
@@ -116,6 +119,12 @@ templ Stats(stats StatsData) {
 				@statTile("Offers Received", fmt.Sprintf("%d", stats.OffersReceived), "Job offers received", "text-green-600", "bg-green-50")
 				<!-- Rejections -->
 				@statTile("Rejections", fmt.Sprintf("%d", stats.Rejections), "Applications rejected", "text-red-600", "bg-red-50")
+				<!-- Ghosted -->
+				@statTile("Ghosted", fmt.Sprintf("%d", stats.Ghosted), "No response received", "text-gray-600", "bg-gray-50")
+				<!-- Freeze -->
+				@statTile("On Freeze", fmt.Sprintf("%d", stats.Freeze), "Roles on hiring freeze", "text-amber-600", "bg-amber-50")
+				<!-- Withdrew -->
+				@statTile("Withdrew", fmt.Sprintf("%d", stats.Withdrew), "Withdrew from process", "text-slate-600", "bg-slate-50")
 				<!-- Average Posted Min -->
 				@statTile("Avg Salary Min", formatSalary(stats.AvgPostedMin), "Average minimum salary", "text-indigo-600", "bg-indigo-50")
 				<!-- Average Posted Max -->

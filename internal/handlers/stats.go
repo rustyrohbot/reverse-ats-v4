@@ -115,6 +115,33 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 	h.dbConn.QueryRow(rejectionsQuery).Scan(&stats.Rejections)
 
+	// Query: Ghosted
+	var ghostedQuery string
+	if whereClause != "" {
+		ghostedQuery = "SELECT COUNT(*) FROM roles" + whereClause + " AND status = 'GHOSTED'"
+	} else {
+		ghostedQuery = "SELECT COUNT(*) FROM roles WHERE status = 'GHOSTED'"
+	}
+	h.dbConn.QueryRow(ghostedQuery).Scan(&stats.Ghosted)
+
+	// Query: Freeze
+	var freezeQuery string
+	if whereClause != "" {
+		freezeQuery = "SELECT COUNT(*) FROM roles" + whereClause + " AND status = 'FREEZE'"
+	} else {
+		freezeQuery = "SELECT COUNT(*) FROM roles WHERE status = 'FREEZE'"
+	}
+	h.dbConn.QueryRow(freezeQuery).Scan(&stats.Freeze)
+
+	// Query: Withdrew
+	var withdrewQuery string
+	if whereClause != "" {
+		withdrewQuery = "SELECT COUNT(*) FROM roles" + whereClause + " AND status = 'WITHDREW'"
+	} else {
+		withdrewQuery = "SELECT COUNT(*) FROM roles WHERE status = 'WITHDREW'"
+	}
+	h.dbConn.QueryRow(withdrewQuery).Scan(&stats.Withdrew)
+
 	// Query: Average Posted Min
 	var avgMinQuery string
 	if whereClause != "" {
@@ -188,9 +215,9 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	// Query: Onsite Roles
 	var onsiteQuery string
 	if whereClause != "" {
-		onsiteQuery = "SELECT COUNT(*) FROM roles" + whereClause + " AND location = 'ON_SITE'"
+		onsiteQuery = "SELECT COUNT(*) FROM roles" + whereClause + " AND location = 'ONSITE'"
 	} else {
-		onsiteQuery = "SELECT COUNT(*) FROM roles WHERE location = 'ON_SITE'"
+		onsiteQuery = "SELECT COUNT(*) FROM roles WHERE location = 'ONSITE'"
 	}
 	h.dbConn.QueryRow(onsiteQuery).Scan(&stats.OnsiteRoles)
 
