@@ -70,17 +70,18 @@ func ImportCompanies(queries *db.Queries, filepath string) error {
 		}
 
 		// Skip if not enough fields
-		if len(record) < 6 {
+		if len(record) < 7 {
 			continue
 		}
 
-		// CSV columns: companyID,name,description,url,hqCity,hqState
+		// CSV columns: companyID,name,description,url,linkedin,hqCity,hqState
 		_, err = queries.CreateCompany(context.Background(), db.CreateCompanyParams{
 			Name:        record[1],
 			Description: nullString(record[2]),
 			Url:         nullString(record[3]),
-			HqCity:      nullString(record[4]),
-			HqState:     nullString(record[5]),
+			Linkedin:    nullString(record[4]),
+			HqCity:      nullString(record[5]),
+			HqState:     nullString(record[6]),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to insert company %s: %w", record[1], err)

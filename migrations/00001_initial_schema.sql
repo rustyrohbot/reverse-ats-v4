@@ -5,6 +5,7 @@ CREATE TABLE companies (
     name TEXT NOT NULL,
     description TEXT,
     url TEXT,
+    linkedin TEXT,
     hq_city TEXT,
     hq_state TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

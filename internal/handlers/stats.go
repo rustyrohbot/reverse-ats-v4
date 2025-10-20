@@ -100,9 +100,9 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	// Query: Offers Received
 	var offersQuery string
 	if whereClause != "" {
-		offersQuery = "SELECT COUNT(*) FROM roles" + whereClause + " AND status = 'OFFERED'"
+		offersQuery = "SELECT COUNT(*) FROM roles" + whereClause + " AND status = 'OFFER'"
 	} else {
-		offersQuery = "SELECT COUNT(*) FROM roles WHERE status = 'OFFERED'"
+		offersQuery = "SELECT COUNT(*) FROM roles WHERE status = 'OFFER'"
 	}
 	h.dbConn.QueryRow(offersQuery).Scan(&stats.OffersReceived)
 

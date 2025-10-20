@@ -55,6 +55,7 @@ func (h *CompaniesHandler) List(w http.ResponseWriter, r *http.Request) {
 			&c.Name,
 			&c.Description,
 			&c.Url,
+			&c.Linkedin,
 			&c.HqCity,
 			&c.HqState,
 			&c.CreatedAt,
@@ -83,6 +84,7 @@ func (h *CompaniesHandler) Create(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	description := nullString(r.FormValue("description"))
 	url := nullString(r.FormValue("url"))
+	linkedin := nullString(r.FormValue("linkedin"))
 	hqCity := nullString(r.FormValue("hq_city"))
 	hqState := nullString(r.FormValue("hq_state"))
 
@@ -90,6 +92,7 @@ func (h *CompaniesHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Name:        name,
 		Description: description,
 		Url:         url,
+		Linkedin:    linkedin,
 		HqCity:      hqCity,
 		HqState:     hqState,
 	})
@@ -137,6 +140,7 @@ func (h *CompaniesHandler) Update(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	description := nullString(r.FormValue("description"))
 	url := nullString(r.FormValue("url"))
+	linkedin := nullString(r.FormValue("linkedin"))
 	hqCity := nullString(r.FormValue("hq_city"))
 	hqState := nullString(r.FormValue("hq_state"))
 
@@ -144,6 +148,7 @@ func (h *CompaniesHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Name:        name,
 		Description: description,
 		Url:         url,
+		Linkedin:    linkedin,
 		HqCity:      hqCity,
 		HqState:     hqState,
 		CompanyID:   id,

@@ -52,6 +52,7 @@ templ CompaniesList(companies []db.Company, sortBy, order string) {
 								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Description</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">URL</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">LinkedIn</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
 									<a href={ templ.SafeURL(getSortLink(sortBy, order, "hq_city")) } class="group inline-flex hover:text-indigo-600">
 										HQ City
@@ -88,6 +89,15 @@ templ CompaniesList(companies []db.Company, sortBy, order string) {
 										if company.Url.Valid {
 											<a href={ templ.SafeURL(company.Url.String) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
 												{ company.Url.String }
+											</a>
+										} else {
+											<span class="text-gray-400">—</span>
+										}
+									</td>
+									<td class="px-3 py-4 text-sm max-w-xs">
+										if company.Linkedin.Valid {
+											<a href={ templ.SafeURL(company.Linkedin.String) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+												{ company.Linkedin.String }
 											</a>
 										} else {
 											<span class="text-gray-400">—</span>
