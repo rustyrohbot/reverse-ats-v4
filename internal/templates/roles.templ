@@ -256,9 +256,13 @@ templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 									</td>
 									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Equity.Valid) }>
 										if role.Equity.Valid {
-											{ role.Equity.String }
+											if role.Equity.Bool {
+												<span class="text-green-600" aria-label="Equity offered">✓</span>
+											} else {
+												<span class="text-red-600" aria-label="No equity">✗</span>
+											}
 										} else {
-											<span class="text-gray-400">—</span>
+											<span class="text-gray-400" aria-label="Not specified">—</span>
 										}
 									</td>
 									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getRemoteCellStyle(role.Location.String, role.WorkCity.Valid) }>

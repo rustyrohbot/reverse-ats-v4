@@ -259,7 +259,7 @@ company_id,name,url,description,cover_letter,application_location,applied_date,c
 - `closed_date` (optional) - Date position closed in YYYY-MM-DD format (use "NULL" if empty)
 - `posted_range_min` (optional) - Minimum salary in thousands (use "NULL" if empty)
 - `posted_range_max` (optional) - Maximum salary in thousands (use "NULL" if empty)
-- `equity` (optional) - Equity range like "0.05-0.15%" (use "NULL" if empty)
+- `equity` (optional) - Boolean indicating if equity is offered (use "true", "false", "yes", "no", "1", "0", or "NULL")
 - `work_city` (optional) - Work location city (use "NULL" if empty)
 - `work_state` (optional) - Work location state (use "NULL" if empty)
 - `location` (optional) - REMOTE, HYBRID, or ON_SITE (use "NULL" if empty)

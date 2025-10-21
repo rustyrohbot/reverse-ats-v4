@@ -228,7 +228,7 @@ func WriteRolesCSV(writer io.Writer, rows *sql.Rows) error {
 			nullToString(role.ClosedDate),
 			nullInt64ToString(role.PostedRangeMin),
 			nullInt64ToString(role.PostedRangeMax),
-			nullToString(role.Equity),
+			nullBoolToString(role.Equity),
 			nullToString(role.WorkCity),
 			nullToString(role.WorkState),
 			nullToString(role.Location),
@@ -370,6 +370,16 @@ func nullToString(ns sql.NullString) string {
 func nullInt64ToString(ni sql.NullInt64) string {
 	if ni.Valid {
 		return strconv.FormatInt(ni.Int64, 10)
+	}
+	return "NULL"
+}
+
+func nullBoolToString(nb sql.NullBool) string {
+	if nb.Valid {
+		if nb.Bool {
+			return "true"
+		}
+		return "false"
 	}
 	return "NULL"
 }

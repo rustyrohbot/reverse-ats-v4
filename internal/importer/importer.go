@@ -44,6 +44,24 @@ func NullInt64(s string) sql.NullInt64 {
 	return sql.NullInt64{Int64: i, Valid: true}
 }
 
+// nullBool converts string to sql.NullBool
+func nullBool(s string) sql.NullBool {
+	if s == "" || s == "NULL" {
+		return sql.NullBool{Valid: false}
+	}
+
+	// Handle various boolean representations
+	s = strings.ToLower(strings.TrimSpace(s))
+	switch s {
+	case "true", "yes", "1", "t", "y":
+		return sql.NullBool{Bool: true, Valid: true}
+	case "false", "no", "0", "f", "n":
+		return sql.NullBool{Bool: false, Valid: true}
+	default:
+		return sql.NullBool{Valid: false}
+	}
+}
+
 // ImportCompanies imports companies from CSV file
 func ImportCompanies(queries *db.Queries, filepath string) error {
 	file, err := os.Open(filepath)
@@ -204,7 +222,7 @@ func ImportRoles(queries *db.Queries, filepath string) error {
 			ClosedDate:          nullString(record[8]),
 			PostedRangeMin:      NullInt64(record[9]),
 			PostedRangeMax:      NullInt64(record[10]),
-			Equity:              nullString(record[11]),
+			Equity:              nullBool(record[11]),
 			WorkCity:            nullString(record[12]),
 			WorkState:           nullString(record[13]),
 			Location:            nullString(record[14]),

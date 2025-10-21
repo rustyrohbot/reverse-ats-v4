@@ -39,7 +39,7 @@ CREATE TABLE roles (
     closed_date TEXT,
     posted_range_min INTEGER,
     posted_range_max INTEGER,
-    equity TEXT,
+    equity BOOLEAN,
     work_city TEXT,
     work_state TEXT,
     location TEXT,

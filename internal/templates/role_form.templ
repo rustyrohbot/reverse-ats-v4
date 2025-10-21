@@ -174,17 +174,18 @@ templ roleFormFields(role *db.Role, companies []db.Company, isEdit bool) {
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
 				</div>
-				<div>
-					<label for="equity" class="block text-sm font-medium text-gray-700">Equity</label>
+				<div class="flex items-center pt-6">
 					<input
-						type="text"
+						type="checkbox"
 						id="equity"
 						name="equity"
-						if role != nil && role.Equity.Valid {
-							value={ role.Equity.String }
+						value="true"
+						if role != nil && role.Equity.Valid && role.Equity.Bool {
+							checked
 						}
-						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+						class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
 					/>
+					<label for="equity" class="ml-2 block text-sm font-medium text-gray-700">Includes Equity</label>
 				</div>
 			</div>
 			<div class="grid grid-cols-3 gap-4">
