@@ -54,7 +54,7 @@ Start the development server:
 make run
 ```
 
-The application will be available at `http://localhost:8080`
+The application will be available at `http://localhost:5627`
 
 ## Project Structure
 
