@@ -34,7 +34,7 @@ func main() {
 	interviewsHandler := handlers.NewInterviewsHandler(queries, dbConn)
 	contactsHandler := handlers.NewContactsHandler(queries, dbConn)
 	statsHandler := handlers.NewStatsHandler(queries, dbConn)
-	exportHandler := handlers.NewExportHandler(queries, dbConn)
+	exportHandler := handlers.NewExportHandler(dbConn)
 	importHandler := handlers.NewImportHandler(queries, dbConn)
 
 	// Setup routes

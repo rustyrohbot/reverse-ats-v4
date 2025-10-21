@@ -4,22 +4,20 @@ import (
 	"archive/zip"
 	"bytes"
 	"database/sql"
-	"encoding/csv"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
-	"reverse-ats/internal/db"
+	"reverse-ats/internal/exporter"
 )
 
 type ExportHandler struct {
-	queries *db.Queries
-	dbConn  *sql.DB
+	dbConn *sql.DB
 }
 
-func NewExportHandler(queries *db.Queries, dbConn *sql.DB) *ExportHandler {
-	return &ExportHandler{queries: queries, dbConn: dbConn}
+func NewExportHandler(dbConn *sql.DB) *ExportHandler {
+	return &ExportHandler{dbConn: dbConn}
 }
 
 func (h *ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
@@ -27,30 +25,68 @@ func (h *ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
 
-	// Export each table
-	if err := h.exportCompanies(zipWriter); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to export companies: %v", err), http.StatusInternalServerError)
-		return
+	// Export steps
+	steps := []struct {
+		name     string
+		filename string
+		fn       func(*sql.DB, string) error
+	}{
+		{"companies", "reverse-ats - Companies.csv", exporter.ExportCompanies},
+		{"roles", "reverse-ats - Roles.csv", exporter.ExportRoles},
+		{"contacts", "reverse-ats - Contacts.csv", exporter.ExportContacts},
+		{"interviews", "reverse-ats - Interviews.csv", exporter.ExportInterviews},
+		{"interviews-contacts", "reverse-ats - InterviewsContacts.csv", exporter.ExportInterviewsContacts},
 	}
 
-	if err := h.exportRoles(zipWriter); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to export roles: %v", err), http.StatusInternalServerError)
-		return
-	}
+	// Export each table to the zip
+	for _, step := range steps {
+		writer, err := zipWriter.Create(step.filename)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to create %s in zip: %v", step.name, err), http.StatusInternalServerError)
+			return
+		}
 
-	if err := h.exportContacts(zipWriter); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to export contacts: %v", err), http.StatusInternalServerError)
-		return
-	}
+		// Query data
+		var query string
+		switch step.name {
+		case "companies":
+			query = "SELECT * FROM companies ORDER BY company_id"
+		case "roles":
+			query = "SELECT * FROM roles ORDER BY role_id"
+		case "contacts":
+			query = "SELECT * FROM contacts ORDER BY contact_id"
+		case "interviews":
+			query = "SELECT * FROM interviews ORDER BY interview_id"
+		case "interviews-contacts":
+			query = "SELECT interviews_contact_id, interview_id, contact_id FROM interviews_contacts ORDER BY interviews_contact_id"
+		}
 
-	if err := h.exportInterviews(zipWriter); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to export interviews: %v", err), http.StatusInternalServerError)
-		return
-	}
+		rows, err := h.dbConn.Query(query)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to query %s: %v", step.name, err), http.StatusInternalServerError)
+			return
+		}
 
-	if err := h.exportInterviewsContacts(zipWriter); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to export interviews-contacts: %v", err), http.StatusInternalServerError)
-		return
+		// Write CSV directly to zip writer
+		var writeErr error
+		switch step.name {
+		case "companies":
+			writeErr = exporter.WriteCompaniesCSV(writer, rows)
+		case "roles":
+			writeErr = exporter.WriteRolesCSV(writer, rows)
+		case "contacts":
+			writeErr = exporter.WriteContactsCSV(writer, rows)
+		case "interviews":
+			writeErr = exporter.WriteInterviewsCSV(writer, rows)
+		case "interviews-contacts":
+			writeErr = exporter.WriteInterviewsContactsCSV(writer, rows)
+		}
+		rows.Close()
+
+		if writeErr != nil {
+			http.Error(w, fmt.Sprintf("Failed to write %s: %v", step.name, writeErr), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Close the zip writer
@@ -68,305 +104,4 @@ func (h *ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 
 	// Write the zip file to the response
 	w.Write(buf.Bytes())
-}
-
-func (h *ExportHandler) exportCompanies(zipWriter *zip.Writer) error {
-	// Query all companies
-	query := "SELECT * FROM companies ORDER BY company_id"
-	rows, err := h.dbConn.Query(query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	writer, err := zipWriter.Create("reverse-ats - Companies.csv")
-	if err != nil {
-		return err
-	}
-
-	csvWriter := csv.NewWriter(writer)
-
-	// Write header
-	csvWriter.Write([]string{"companyID", "name", "description", "url", "linkedin", "hqCity", "hqState"})
-
-	// Write data
-	for rows.Next() {
-		var company db.Company
-		err := rows.Scan(
-			&company.CompanyID,
-			&company.Name,
-			&company.Description,
-			&company.Url,
-			&company.Linkedin,
-			&company.HqCity,
-			&company.HqState,
-			&company.CreatedAt,
-			&company.UpdatedAt,
-		)
-		if err != nil {
-			return err
-		}
-
-		csvWriter.Write([]string{
-			strconv.FormatInt(company.CompanyID, 10),
-			company.Name,
-			nullToString(company.Description),
-			nullToString(company.Url),
-			nullToString(company.Linkedin),
-			nullToString(company.HqCity),
-			nullToString(company.HqState),
-		})
-	}
-
-	csvWriter.Flush()
-	return csvWriter.Error()
-}
-
-func (h *ExportHandler) exportRoles(zipWriter *zip.Writer) error {
-	// Query all roles
-	query := "SELECT * FROM roles ORDER BY role_id"
-	rows, err := h.dbConn.Query(query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	writer, err := zipWriter.Create("reverse-ats - Roles.csv")
-	if err != nil {
-		return err
-	}
-
-	csvWriter := csv.NewWriter(writer)
-
-	// Write header
-	csvWriter.Write([]string{
-		"roleID", "companyID", "name", "url", "description", "coverLetter",
-		"applicationLocation", "appliedDate", "closedDate", "postedRangeMin",
-		"postedRangeMax", "equity", "workCity", "workState", "location",
-		"status", "discovery", "referral", "notes",
-	})
-
-	// Write data
-	for rows.Next() {
-		var role db.Role
-		err := rows.Scan(
-			&role.RoleID,
-			&role.CompanyID,
-			&role.Name,
-			&role.Url,
-			&role.Description,
-			&role.CoverLetter,
-			&role.ApplicationLocation,
-			&role.AppliedDate,
-			&role.ClosedDate,
-			&role.PostedRangeMin,
-			&role.PostedRangeMax,
-			&role.Equity,
-			&role.WorkCity,
-			&role.WorkState,
-			&role.Location,
-			&role.Status,
-			&role.Discovery,
-			&role.Referral,
-			&role.Notes,
-			&role.CreatedAt,
-			&role.UpdatedAt,
-		)
-		if err != nil {
-			return err
-		}
-
-		csvWriter.Write([]string{
-			strconv.FormatInt(role.RoleID, 10),
-			strconv.FormatInt(role.CompanyID, 10),
-			role.Name,
-			nullToString(role.Url),
-			nullToString(role.Description),
-			nullToString(role.CoverLetter),
-			nullToString(role.ApplicationLocation),
-			nullToString(role.AppliedDate),
-			nullToString(role.ClosedDate),
-			nullInt64ToString(role.PostedRangeMin),
-			nullInt64ToString(role.PostedRangeMax),
-			nullToString(role.Equity),
-			nullToString(role.WorkCity),
-			nullToString(role.WorkState),
-			nullToString(role.Location),
-			nullToString(role.Status),
-			nullToString(role.Discovery),
-			nullToString(role.Referral),
-			nullToString(role.Notes),
-		})
-	}
-
-	csvWriter.Flush()
-	return csvWriter.Error()
-}
-
-func (h *ExportHandler) exportContacts(zipWriter *zip.Writer) error {
-	// Query all contacts
-	query := "SELECT * FROM contacts ORDER BY contact_id"
-	rows, err := h.dbConn.Query(query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	writer, err := zipWriter.Create("reverse-ats - Contacts.csv")
-	if err != nil {
-		return err
-	}
-
-	csvWriter := csv.NewWriter(writer)
-
-	// Write header
-	csvWriter.Write([]string{
-		"contactID", "companyID", "firstName", "lastName", "role",
-		"email", "phone", "linkedin", "notes",
-	})
-
-	// Write data
-	for rows.Next() {
-		var contact db.Contact
-		err := rows.Scan(
-			&contact.ContactID,
-			&contact.CompanyID,
-			&contact.FirstName,
-			&contact.LastName,
-			&contact.Role,
-			&contact.Email,
-			&contact.Phone,
-			&contact.Linkedin,
-			&contact.Notes,
-			&contact.CreatedAt,
-			&contact.UpdatedAt,
-		)
-		if err != nil {
-			return err
-		}
-
-		csvWriter.Write([]string{
-			strconv.FormatInt(contact.ContactID, 10),
-			strconv.FormatInt(contact.CompanyID, 10),
-			contact.FirstName,
-			contact.LastName,
-			nullToString(contact.Role),
-			nullToString(contact.Email),
-			nullToString(contact.Phone),
-			nullToString(contact.Linkedin),
-			nullToString(contact.Notes),
-		})
-	}
-
-	csvWriter.Flush()
-	return csvWriter.Error()
-}
-
-func (h *ExportHandler) exportInterviews(zipWriter *zip.Writer) error {
-	// Query all interviews
-	query := "SELECT * FROM interviews ORDER BY interview_id"
-	rows, err := h.dbConn.Query(query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	writer, err := zipWriter.Create("reverse-ats - Interviews.csv")
-	if err != nil {
-		return err
-	}
-
-	csvWriter := csv.NewWriter(writer)
-
-	// Write header
-	csvWriter.Write([]string{
-		"interviewID", "roleID", "date", "start", "end", "notes", "type",
-	})
-
-	// Write data
-	for rows.Next() {
-		var interview db.Interview
-		err := rows.Scan(
-			&interview.InterviewID,
-			&interview.RoleID,
-			&interview.Date,
-			&interview.Start,
-			&interview.End,
-			&interview.Notes,
-			&interview.Type,
-			&interview.CreatedAt,
-			&interview.UpdatedAt,
-		)
-		if err != nil {
-			return err
-		}
-
-		csvWriter.Write([]string{
-			strconv.FormatInt(interview.InterviewID, 10),
-			strconv.FormatInt(interview.RoleID, 10),
-			interview.Date,
-			interview.Start,
-			interview.End,
-			nullToString(interview.Notes),
-			interview.Type,
-		})
-	}
-
-	csvWriter.Flush()
-	return csvWriter.Error()
-}
-
-func (h *ExportHandler) exportInterviewsContacts(zipWriter *zip.Writer) error {
-	// Query all interview-contact links
-	query := "SELECT interviews_contact_id, interview_id, contact_id FROM interviews_contacts ORDER BY interviews_contact_id"
-	rows, err := h.dbConn.Query(query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	writer, err := zipWriter.Create("reverse-ats - InterviewsContacts.csv")
-	if err != nil {
-		return err
-	}
-
-	csvWriter := csv.NewWriter(writer)
-
-	// Write header
-	csvWriter.Write([]string{
-		"interviewsContactId", "interviewId", "contactId",
-	})
-
-	// Write data
-	for rows.Next() {
-		var id, interviewID, contactID int64
-		err := rows.Scan(&id, &interviewID, &contactID)
-		if err != nil {
-			return err
-		}
-
-		csvWriter.Write([]string{
-			strconv.FormatInt(id, 10),
-			strconv.FormatInt(interviewID, 10),
-			strconv.FormatInt(contactID, 10),
-		})
-	}
-
-	csvWriter.Flush()
-	return csvWriter.Error()
-}
-
-// Helper functions
-func nullToString(ns sql.NullString) string {
-	if ns.Valid {
-		return ns.String
-	}
-	return ""
-}
-
-func nullInt64ToString(ni sql.NullInt64) string {
-	if ni.Valid {
-		return strconv.FormatInt(ni.Int64, 10)
-	}
-	return ""
 }
