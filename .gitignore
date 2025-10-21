@@ -44,4 +44,7 @@ static/output.css
 tmp/
 
 # User data files (keep sample_data/)
-data/
+import/
+!cmd/import/
+export/
+!cmd/export/

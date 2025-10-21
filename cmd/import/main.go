@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// Fixed paths
-	csvDir := "./data"
+	csvDir := "./import"
 	dbPath := "./data.db"
 
 	// Check if directory exists

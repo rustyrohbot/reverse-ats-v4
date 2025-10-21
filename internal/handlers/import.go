@@ -100,22 +100,21 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Map of form field names to importer functions
-	type importFunc func(*db.Queries, string) error
-	imports := map[string]struct {
-		fn       importFunc
-		uploaded bool
-		tempPath string
-	}{
-		"companies":           {fn: importer.ImportCompanies},
-		"roles":               {fn: importer.ImportRoles},
-		"interviews":          {fn: importer.ImportInterviews},
-		"contacts":            {fn: importer.ImportContacts},
-		"interviews_contacts": {fn: importer.ImportInterviewsContacts},
+	// Map form field names to step names
+	fieldToStep := map[string]string{
+		"companies":           "companies",
+		"roles":               "roles",
+		"contacts":            "contacts",
+		"interviews":          "interviews",
+		"interviews_contacts": "interviews-contacts",
 	}
 
-	// Process each uploaded file
-	for fieldName := range imports {
+	// Get import steps in correct order
+	steps := importer.GetImportSteps()
+
+	// Process uploaded files and map them to steps
+	uploadedSteps := make(map[string]string) // step name -> temp file path
+	for fieldName, stepName := range fieldToStep {
 		file, header, err := r.FormFile(fieldName)
 		if err != nil {
 			// File is optional, skip if not provided
@@ -135,44 +134,32 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		}
 
 		tempFiles = append(tempFiles, tempPath)
-		entry := imports[fieldName]
-		entry.uploaded = true
-		entry.tempPath = tempPath
-		imports[fieldName] = entry
+		uploadedSteps[stepName] = tempPath
 	}
 
 	// Check if at least one file was uploaded
-	hasUploads := false
-	for _, entry := range imports {
-		if entry.uploaded {
-			hasUploads = true
-			break
-		}
-	}
-
-	if !hasUploads {
+	if len(uploadedSteps) == 0 {
 		http.Error(w, "No files uploaded", http.StatusBadRequest)
 		return
 	}
 
-	// Import files in the correct order (respecting foreign keys)
-	importOrder := []string{"companies", "roles", "contacts", "interviews", "interviews_contacts"}
-
-	var errors []string
-	for _, fieldName := range importOrder {
-		entry := imports[fieldName]
-		if !entry.uploaded {
-			continue
-		}
-
-		if err := entry.fn(h.queries, entry.tempPath); err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", fieldName, err))
+	// Set filepaths for uploaded steps
+	for i := range steps {
+		if tempPath, ok := uploadedSteps[steps[i].Name]; ok {
+			steps[i].Filepath = tempPath
 		}
 	}
 
+	// Import using shared logic (skip missing files)
+	errors := importer.ImportFromSteps(h.queries, steps, true)
+
 	// Return response
 	if len(errors) > 0 {
-		http.Error(w, "Import completed with errors:\n"+strings.Join(errors, "\n"), http.StatusInternalServerError)
+		var errorMessages []string
+		for _, err := range errors {
+			errorMessages = append(errorMessages, err.Error())
+		}
+		http.Error(w, "Import completed with errors:\n"+strings.Join(errorMessages, "\n"), http.StatusInternalServerError)
 		return
 	}
 

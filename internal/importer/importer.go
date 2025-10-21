@@ -333,35 +333,79 @@ func ImportInterviewsContacts(queries *db.Queries, filepath string) error {
 }
 
 // ImportAll imports all CSV files from the specified directory
-func ImportAll(queries *db.Queries, dir string) error {
-	// Import in order due to foreign key constraints
-	steps := []struct {
-		name     string
-		filename string
-		fn       func(*db.Queries, string) error
-	}{
-		{"companies", "reverse-ats - Companies.csv", ImportCompanies},
-		{"contacts", "reverse-ats - Contacts.csv", ImportContacts},
-		{"roles", "reverse-ats - Roles.csv", ImportRoles},
-		{"interviews", "reverse-ats - Interviews.csv", ImportInterviews},
-		{"interview-contact links", "reverse-ats - InterviewsContacts.csv", ImportInterviewsContacts},
+// ImportStep represents a single import operation
+type ImportStep struct {
+	Name     string
+	Filename string
+	Filepath string
+	Fn       func(*db.Queries, string) error
+}
+
+// GetImportSteps returns the import steps in the correct order (respecting foreign keys)
+func GetImportSteps() []ImportStep {
+	return []ImportStep{
+		{"companies", "reverse-ats - Companies.csv", "", ImportCompanies},
+		{"roles", "reverse-ats - Roles.csv", "", ImportRoles},
+		{"contacts", "reverse-ats - Contacts.csv", "", ImportContacts},
+		{"interviews", "reverse-ats - Interviews.csv", "", ImportInterviews},
+		{"interviews-contacts", "reverse-ats - InterviewsContacts.csv", "", ImportInterviewsContacts},
 	}
+}
+
+// ImportFromSteps imports data from a list of steps, skipping missing files
+// Returns a list of errors encountered (doesn't stop on first error)
+func ImportFromSteps(queries *db.Queries, steps []ImportStep, skipMissing bool) []error {
+	var errors []error
 
 	for _, step := range steps {
-		filepath := dir + "/" + step.filename
+		if step.Filepath == "" {
+			if skipMissing {
+				continue
+			}
+			errors = append(errors, fmt.Errorf("%s: no file provided", step.Name))
+			continue
+		}
+
+		// Check if file exists
+		if _, err := os.Stat(step.Filepath); os.IsNotExist(err) {
+			if skipMissing {
+				continue
+			}
+			errors = append(errors, fmt.Errorf("%s: file not found: %s", step.Name, step.Filepath))
+			continue
+		}
+
+		fmt.Printf("Importing %s from %s...\n", step.Name, step.Filepath)
+		if err := step.Fn(queries, step.Filepath); err != nil {
+			errors = append(errors, fmt.Errorf("%s: %w", step.Name, err))
+			continue
+		}
+	}
+
+	return errors
+}
+
+func ImportAll(queries *db.Queries, dir string) error {
+	steps := GetImportSteps()
+
+	// Set filepaths for all steps
+	for i := range steps {
+		filepath := dir + "/" + steps[i].Filename
 		// Check if file exists
 		if _, err := os.Stat(filepath); os.IsNotExist(err) {
 			// Try without space in filename
 			filepath = strings.ReplaceAll(filepath, " ", "")
 			if _, err := os.Stat(filepath); os.IsNotExist(err) {
-				return fmt.Errorf("file not found: %s", step.filename)
+				return fmt.Errorf("file not found: %s", steps[i].Filename)
 			}
 		}
+		steps[i].Filepath = filepath
+	}
 
-		fmt.Printf("Importing %s from %s...\n", step.name, filepath)
-		if err := step.fn(queries, filepath); err != nil {
-			return err
-		}
+	// Import with error collection (but fail on first error for CLI compatibility)
+	errors := ImportFromSteps(queries, steps, false)
+	if len(errors) > 0 {
+		return errors[0]
 	}
 
 	fmt.Println("\n✅ All data imported successfully!")

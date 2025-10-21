@@ -1,5 +1,5 @@
 {
-  "name": "reverse-ats-v3",
+  "name": "reverse-ats-v4",
   "version": "1.0.0",
   "description": "A web application for tracking job applications, interviews, and contacts during your job search. Built to replace a spreadsheet-based workflow with a modern, user-friendly interface.",
   "main": "index.js",

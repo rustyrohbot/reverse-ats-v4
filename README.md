@@ -45,7 +45,7 @@ make migrate-up
 ```bash
 go run cmd/import/main.go
 ```
-Note: The importer looks for CSV files in the `./data` directory.
+Note: The importer looks for CSV files in the `./import` directory.
 
 ### Development
 
@@ -167,7 +167,7 @@ The import tool allows you to bulk-load data from CSV files into the database. T
 
 ### Quick Start
 
-1. **Place your CSV files** in the `./data` directory with these exact names:
+1. **Place your CSV files** in the `./import` directory with these exact names:
    - `reverse-ats - Companies.csv`
    - `reverse-ats - Roles.csv`
    - `reverse-ats - Interviews.csv`
@@ -180,7 +180,7 @@ The import tool allows you to bulk-load data from CSV files into the database. T
    ```
 
 The importer will automatically:
-- Read all CSV files from `./data`
+- Read all CSV files from `./import`
 - Import them into `./data.db`
 - Display progress and results
 
@@ -293,7 +293,7 @@ go run cmd/import/main.go
 1. Create sheets with the column headers listed above
 2. Fill in your data
 3. Export each sheet as CSV with the exact filenames shown
-4. Place them in the `./data` directory
+4. Place them in the `./import` directory
 
 **Option 2: Export from Existing Spreadsheet**
 If you're already tracking job applications in a spreadsheet:
