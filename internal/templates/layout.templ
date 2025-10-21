@@ -101,15 +101,15 @@ templ Layout(title string) {
 									/>
 									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Companies.csv</p>
 								</div>
-								<!-- Roles CSV -->
+								<!-- Contacts CSV -->
 								<div>
-									<label for="roles-file" class="block text-sm font-medium text-gray-700">
-										Roles CSV
+									<label for="contacts-file" class="block text-sm font-medium text-gray-700">
+										Contacts CSV
 									</label>
 									<input
 										type="file"
-										id="roles-file"
-										name="roles"
+										id="contacts-file"
+										name="contacts"
 										accept=".csv"
 										class="mt-1 block w-full text-sm text-gray-500
 											file:mr-4 file:py-2 file:px-4
@@ -118,7 +118,7 @@ templ Layout(title string) {
 											file:bg-indigo-50 file:text-indigo-700
 											hover:file:bg-indigo-100"
 									/>
-									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Roles.csv</p>
+									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Contacts.csv</p>
 								</div>
 								<!-- Interviews CSV -->
 								<div>
@@ -139,25 +139,6 @@ templ Layout(title string) {
 									/>
 									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Interviews.csv</p>
 								</div>
-								<!-- Contacts CSV -->
-								<div>
-									<label for="contacts-file" class="block text-sm font-medium text-gray-700">
-										Contacts CSV
-									</label>
-									<input
-										type="file"
-										id="contacts-file"
-										name="contacts"
-										accept=".csv"
-										class="mt-1 block w-full text-sm text-gray-500
-											file:mr-4 file:py-2 file:px-4
-											file:rounded-md file:border-0
-											file:text-sm file:font-semibold
-											file:bg-indigo-50 file:text-indigo-700
-											hover:file:bg-indigo-100"
-									/>
-									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Contacts.csv</p>
-								</div>
 								<!-- InterviewsContacts CSV -->
 								<div>
 									<label for="interviews-contacts-file" class="block text-sm font-medium text-gray-700">
@@ -176,6 +157,25 @@ templ Layout(title string) {
 											hover:file:bg-indigo-100"
 									/>
 									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - InterviewsContacts.csv</p>
+								</div>
+								<!-- Roles CSV -->
+								<div>
+									<label for="roles-file" class="block text-sm font-medium text-gray-700">
+										Roles CSV
+									</label>
+									<input
+										type="file"
+										id="roles-file"
+										name="roles"
+										accept=".csv"
+										class="mt-1 block w-full text-sm text-gray-500
+											file:mr-4 file:py-2 file:px-4
+											file:rounded-md file:border-0
+											file:text-sm file:font-semibold
+											file:bg-indigo-50 file:text-indigo-700
+											hover:file:bg-indigo-100"
+									/>
+									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Roles.csv</p>
 								</div>
 							</div>
 							<div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
