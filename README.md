@@ -61,17 +61,21 @@ The application will be available at `http://localhost:8080`
 ```
 ├── cmd/
 │   ├── server/          # Main application entry point
-│   └── import/          # CSV import utility
+│   ├── import/          # CSV import CLI utility
+│   └── export/          # CSV export CLI utility
 ├── internal/
 │   ├── handlers/        # HTTP request handlers
 │   ├── db/              # sqlc generated database code
 │   ├── database/        # Database connection setup
-│   ├── importer/        # CSV import logic
+│   ├── importer/        # CSV import logic (shared)
+│   ├── exporter/        # CSV export logic (shared)
+│   ├── util/            # Shared utilities (date formatting, etc.)
 │   └── templates/       # templ template files
 ├── migrations/          # goose SQL migration files
 ├── queries/             # SQL queries for sqlc
 ├── static/              # CSS, JS, and static assets
-├── data/                # Your CSV files for import (gitignored)
+├── import/              # CSV files for import (gitignored)
+├── export/              # Exported CSV files (gitignored)
 └── sample_data/         # Sample CSV files for reference
 ```
 
@@ -99,6 +103,12 @@ The application will be available at `http://localhost:8080`
   - HTMX-powered interactions without page reloads
   - Scrollable text columns for descriptions and notes
 
+- **Data Import/Export** - Flexible data management
+  - Web-based CSV import via drag-and-drop modal
+  - CLI-based batch import from directory
+  - CLI-based export to CSV files
+  - Consistent NULL value handling across import/export
+
 ## Database Schema
 
 The application manages five main entities:
@@ -125,8 +135,11 @@ make migrate-down
 # Check migration status
 make migrate-status
 
-# Import CSV data
+# Import CSV data from ./import directory
 go run cmd/import/main.go
+
+# Export all data to ./export directory
+go run cmd/export/main.go
 ```
 
 ### Code Generation
@@ -158,14 +171,39 @@ go test ./...
 make clean
 ```
 
-## CSV Import
+## Data Import and Export
 
-The import tool allows you to bulk-load data from CSV files into the database. This is useful for:
+The application provides two methods for importing and exporting data:
+
+### Web-Based Import
+
+Import CSV files directly through the web interface:
+
+1. Click the **Import** button in the top navigation
+2. Upload CSV files (one or more of the following):
+   - Companies
+   - Roles
+   - Contacts
+   - Interviews
+   - InterviewsContacts
+3. Files are validated for size (max 10MB) and type (.csv only)
+4. Data is imported with proper foreign key ordering
+
+**Security features:**
+- File type validation (CSV only)
+- File size limits (10MB per file)
+- Secure temporary file handling
+- Automatic cleanup after processing
+
+### CLI-Based Import
+
+The CLI import tool allows you to bulk-load data from CSV files into the database. This is useful for:
 - Initial data migration from spreadsheets
 - Testing with sample data
 - Backup and restore operations
+- Batch imports without using the web interface
 
-### Quick Start
+#### CLI Import Quick Start
 
 1. **Place your CSV files** in the `./import` directory with these exact names:
    - `reverse-ats - Companies.csv`
@@ -190,73 +228,76 @@ Each CSV file must have specific columns. Here are the required formats:
 
 #### Companies (`reverse-ats - Companies.csv`)
 ```csv
-name,description,url,hq_city,hq_state
-TechCorp,Leading technology company,https://techcorp.com,San Francisco,CA
-DataSys,Data analytics platform,https://datasys.com,Seattle,WA
+companyID,name,description,url,linkedin,hqCity,hqState
+1,TechCorp,Leading technology company,https://techcorp.com,NULL,San Francisco,CA
+2,DataSys,NULL,https://datasys.com,NULL,Seattle,WA
 ```
 
 **Columns:**
+- `companyID` (optional for import) - Company ID (auto-generated if not provided)
 - `name` (required) - Company name
-- `description` (optional) - Company description
-- `url` (optional) - Company website
-- `hq_city` (optional) - Headquarters city
-- `hq_state` (optional) - Headquarters state
+- `description` (optional) - Company description (leave empty or use "NULL")
+- `url` (optional) - Company website (leave empty or use "NULL")
+- `linkedin` (optional) - Company LinkedIn URL (leave empty or use "NULL")
+- `hqCity` (optional) - Headquarters city (leave empty or use "NULL")
+- `hqState` (optional) - Headquarters state (leave empty or use "NULL")
 
 #### Roles (`reverse-ats - Roles.csv`)
 ```csv
 company_id,name,url,description,cover_letter,application_location,applied_date,closed_date,posted_range_min,posted_range_max,equity,work_city,work_state,location,status,discovery,referral,notes
-1,Senior Backend Engineer,https://techcorp.com/jobs/123,Build scalable systems,Dear Hiring Manager...,https://apply.techcorp.com,2025-01-15,,150,200,0.05-0.15%,San Francisco,CA,HYBRID,APPLIED,LinkedIn,,Great team
+1,Senior Backend Engineer,https://techcorp.com/jobs/123,Build scalable systems,NULL,LinkedIn,2025-01-15,NULL,150,200,0.05-0.15%,San Francisco,CA,HYBRID,APPLIED,LinkedIn,NULL,Great team
 ```
 
 **Columns:**
 - `company_id` (required) - References company (must exist in Companies)
 - `name` (required) - Job title/role name
-- `url` (optional) - Job posting URL
-- `description` (optional) - Job description
-- `cover_letter` (optional) - Your cover letter text
-- `application_location` (optional) - Where you applied (e.g., "LinkedIn", "Company Website")
-- `applied_date` (optional) - Date applied (YYYY-MM-DD format)
-- `closed_date` (optional) - Date position closed (YYYY-MM-DD format)
-- `posted_range_min` (optional) - Minimum salary in thousands (e.g., 150 for $150k)
-- `posted_range_max` (optional) - Maximum salary in thousands (e.g., 200 for $200k)
-- `equity` (optional) - Equity range (e.g., "0.05-0.15%")
-- `work_city` (optional) - Work location city
-- `work_state` (optional) - Work location state
-- `location` (optional) - REMOTE, HYBRID, or ON_SITE
-- `status` (optional) - RESEARCHING, APPLIED, INTERVIEWING, OFFERED, ACCEPTED, REJECTED, WITHDRAWN
-- `discovery` (optional) - How you found the role
-- `referral` (optional) - Who referred you
-- `notes` (optional) - Additional notes
+- `url` (optional) - Job posting URL (use "NULL" if empty)
+- `description` (optional) - Job description (use "NULL" if empty)
+- `cover_letter` (optional) - Your cover letter text (use "NULL" if empty)
+- `application_location` (optional) - Where you applied (use "NULL" if empty)
+- `applied_date` (optional) - Date applied in YYYY-MM-DD format (use "NULL" if empty)
+- `closed_date` (optional) - Date position closed in YYYY-MM-DD format (use "NULL" if empty)
+- `posted_range_min` (optional) - Minimum salary in thousands (use "NULL" if empty)
+- `posted_range_max` (optional) - Maximum salary in thousands (use "NULL" if empty)
+- `equity` (optional) - Equity range like "0.05-0.15%" (use "NULL" if empty)
+- `work_city` (optional) - Work location city (use "NULL" if empty)
+- `work_state` (optional) - Work location state (use "NULL" if empty)
+- `location` (optional) - REMOTE, HYBRID, or ON_SITE (use "NULL" if empty)
+- `status` (optional) - RESEARCHING, APPLIED, INTERVIEWING, OFFERED, ACCEPTED, REJECTED, WITHDRAWN (use "NULL" if empty)
+- `discovery` (optional) - How you found the role (use "NULL" if empty)
+- `referral` (optional) - Who referred you (use "NULL" if empty)
+- `notes` (optional) - Additional notes (use "NULL" if empty)
 
 #### Interviews (`reverse-ats - Interviews.csv`)
 ```csv
 role_id,date,start,end,type,notes
 1,2025-01-22,10:00,10:30,RECRUITER,Initial phone screen with Sarah
-3,2025-01-25,14:00,15:00,TECH_SCREEN,System design discussion
+3,2025-01-25,14:00,15:00,TECH_SCREEN,NULL
 ```
 
 **Columns:**
 - `role_id` (required) - References role (must exist in Roles)
-- `date` (required) - Interview date (YYYY-MM-DD format)
-- `start` (required) - Start time (HH:MM format, 24-hour)
-- `end` (required) - End time (HH:MM format, 24-hour)
+- `date` (required) - Interview date in YYYY-MM-DD format
+- `start` (required) - Start time in HH:MM format (24-hour)
+- `end` (required) - End time in HH:MM format (24-hour)
 - `type` (required) - RECRUITER, TECH_SCREEN, MANAGER, LOOP, or MISC
-- `notes` (optional) - Interview notes
+- `notes` (optional) - Interview notes (use "NULL" if empty)
 
 #### Contacts (`reverse-ats - Contacts.csv`)
 ```csv
 company_id,first_name,last_name,email,phone,linkedin,notes
 1,Sarah,Johnson,sarah@techcorp.com,415-555-0123,https://linkedin.com/in/sarahjohnson,Recruiter - very responsive
+2,Michael,Chen,NULL,NULL,https://linkedin.com/in/michaelchen,NULL
 ```
 
 **Columns:**
 - `company_id` (required) - References company (must exist in Companies)
 - `first_name` (required) - Contact's first name
 - `last_name` (required) - Contact's last name
-- `email` (optional) - Email address
-- `phone` (optional) - Phone number
-- `linkedin` (optional) - LinkedIn profile URL
-- `notes` (optional) - Notes about the contact
+- `email` (optional) - Email address (use "NULL" if empty)
+- `phone` (optional) - Phone number (use "NULL" if empty)
+- `linkedin` (optional) - LinkedIn profile URL (use "NULL" if empty)
+- `notes` (optional) - Notes about the contact (use "NULL" if empty)
 
 #### InterviewsContacts (`reverse-ats - InterviewsContacts.csv`)
 ```csv
@@ -280,8 +321,9 @@ Sample CSV files are included in `./sample_data` directory for reference:
 
 You can examine these files to understand the expected format. To use the sample data:
 ```bash
-# Copy sample files to data directory
-cp sample_data/* data/
+# Create import directory and copy sample files
+mkdir -p import
+cp sample_data/* import/
 
 # Run the importer
 go run cmd/import/main.go
@@ -306,14 +348,40 @@ If you're already tracking job applications in a spreadsheet:
 1. Use the application's web interface to add data manually
 2. No CSV import needed!
 
-### Import Tips
 
-- **Import Order**: The importer automatically handles the correct order (Companies → Roles → Interviews/Contacts)
+### CLI-Based Export
+
+Export all data to CSV files for backup or external analysis:
+
+```bash
+# Export all data to ./export directory
+go run cmd/export/main.go
+```
+
+The export tool will:
+- Create the `./export` directory if it doesn't exist
+- Export all five tables to separate CSV files
+- Use consistent NULL formatting ("NULL" string for missing values)
+- Name files with the standard naming convention
+
+**Exported files:**
+- `reverse-ats - Companies.csv`
+- `reverse-ats - Roles.csv`
+- `reverse-ats - Contacts.csv`
+- `reverse-ats - Interviews.csv`
+- `reverse-ats - InterviewsContacts.csv`
+
+You can also export via the web interface by clicking the **Export** button, which downloads a zip file containing all CSV files.
+
+### Import/Export Tips
+
+- **Import Order**: The importer automatically handles the correct order (Companies → Roles → Contacts → Interviews → InterviewsContacts)
 - **IDs**: Company and role IDs in your CSV are matched during import
-- **Empty Values**: Leave cells blank for optional fields - don't use "N/A" or "null"
-- **Dates**: Always use YYYY-MM-DD format (e.g., 2025-01-15)
+- **NULL Values**: Use the string "NULL" (all caps) for missing/empty values in CSV files. Both import and export use this convention for consistency.
+- **Dates**: Always use YYYY-MM-DD format (e.g., 2025-01-15) in CSV files. The application will display them in text format (e.g., "January 15, 2025") in the UI.
 - **Times**: Use 24-hour format HH:MM (e.g., 14:30 for 2:30 PM)
 - **Re-importing**: The importer appends data - delete `./data.db` first if you want to start fresh
+- **Round-trip Compatibility**: Files exported via the CLI can be directly re-imported without modification
 
 ## Development Workflow
 
