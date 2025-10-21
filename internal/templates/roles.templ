@@ -302,9 +302,13 @@ templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 									</td>
 									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Referral.Valid) }>
 										if role.Referral.Valid {
-											{ role.Referral.String }
+											if role.Referral.Bool {
+												<span class="text-green-600" aria-label="Referral">✓</span>
+											} else {
+												<span class="text-red-600" aria-label="No referral">✗</span>
+											}
 										} else {
-											<span class="text-gray-400">—</span>
+											<span class="text-gray-400" aria-label="Not specified">—</span>
 										}
 									</td>
 									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.Notes.Valid) }>

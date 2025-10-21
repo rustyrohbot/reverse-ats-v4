@@ -45,7 +45,7 @@ CREATE TABLE roles (
     location TEXT,
     status TEXT,
     discovery TEXT,
-    referral TEXT,
+    referral BOOLEAN,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

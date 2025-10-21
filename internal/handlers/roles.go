@@ -158,7 +158,7 @@ func (h *RolesHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Location:            nullString(r.FormValue("location")),
 		Status:              nullString(r.FormValue("status")),
 		Discovery:           nullString(r.FormValue("discovery")),
-		Referral:            nullString(r.FormValue("referral")),
+		Referral:            nullBool(r.FormValue("referral")),
 		Notes:               nullString(r.FormValue("notes")),
 	})
 	if err != nil {
@@ -231,7 +231,7 @@ func (h *RolesHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Location:            nullString(r.FormValue("location")),
 		Status:              nullString(r.FormValue("status")),
 		Discovery:           nullString(r.FormValue("discovery")),
-		Referral:            nullString(r.FormValue("referral")),
+		Referral:            nullBool(r.FormValue("referral")),
 		Notes:               nullString(r.FormValue("notes")),
 		RoleID:              id,
 	})

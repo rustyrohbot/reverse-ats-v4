@@ -265,7 +265,7 @@ company_id,name,url,description,cover_letter,application_location,applied_date,c
 - `location` (optional) - REMOTE, HYBRID, or ON_SITE (use "NULL" if empty)
 - `status` (optional) - RESEARCHING, APPLIED, INTERVIEWING, OFFERED, ACCEPTED, REJECTED, WITHDRAWN (use "NULL" if empty)
 - `discovery` (optional) - How you found the role (use "NULL" if empty)
-- `referral` (optional) - Who referred you (use "NULL" if empty)
+- `referral` (optional) - Boolean indicating if you had a referral (use "true", "false", "yes", "no", "1", "0", or "NULL")
 - `notes` (optional) - Additional notes (use "NULL" if empty)
 
 #### Interviews (`reverse-ats - Interviews.csv`)

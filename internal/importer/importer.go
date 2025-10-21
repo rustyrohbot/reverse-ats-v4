@@ -228,7 +228,7 @@ func ImportRoles(queries *db.Queries, filepath string) error {
 			Location:            nullString(record[14]),
 			Status:              nullString(record[15]),
 			Discovery:           nullString(record[16]),
-			Referral:            nullString(record[17]),
+			Referral:            nullBool(record[17]),
 			Notes:               nullString(record[18]),
 		})
 		if err != nil {

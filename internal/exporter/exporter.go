@@ -234,7 +234,7 @@ func WriteRolesCSV(writer io.Writer, rows *sql.Rows) error {
 			nullToString(role.Location),
 			nullToString(role.Status),
 			nullToString(role.Discovery),
-			nullToString(role.Referral),
+			nullBoolToString(role.Referral),
 			nullToString(role.Notes),
 		})
 	}
