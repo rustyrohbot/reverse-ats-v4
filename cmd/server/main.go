@@ -134,9 +134,9 @@ func main() {
 	mux.HandleFunc("/import", importHandler.Import)
 
 	// Start server
-	port := os.Getenv("PORT")
+	port := os.Getenv("REVERSE_ATS_PORT")
 	if port == "" {
-		port = "8080"
+		port = "5627"
 	}
 
 	log.Printf("Starting server on http://localhost:%s", port)
