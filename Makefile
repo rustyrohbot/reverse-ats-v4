@@ -28,7 +28,7 @@ run:
 	go run cmd/server/main.go
 
 # Build the application
-build: generate css
+build: 
 	go build -o bin/server cmd/server/main.go
 
 # Clean generated files and binaries

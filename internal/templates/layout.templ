@@ -36,7 +36,13 @@ templ Layout(title string) {
 								</a>
 							</div>
 						</div>
-						<div class="flex items-center">
+						<div class="flex items-center gap-3">
+							<button type="button" onclick="openImportModal()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+								<svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+								</svg>
+								Import
+							</button>
 							<a href="/export" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
 								<svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -50,6 +56,164 @@ templ Layout(title string) {
 			<main class="mx-auto px-4 sm:px-6 lg:px-8 py-8">
 				{ children... }
 			</main>
+			<!-- Import Modal -->
+			<div id="import-modal" class="hidden fixed z-50 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+				<div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
+					<!-- Background overlay -->
+					<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeImportModal()"></div>
+					<!-- Modal panel -->
+					<div class="relative inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+						<div>
+							<div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+								<svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+								</svg>
+							</div>
+							<div class="mt-3 text-center sm:mt-5">
+								<h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+									Import Data
+								</h3>
+								<div class="mt-2">
+									<p class="text-sm text-gray-500">
+										Upload CSV files to import your data. Files must match the expected format.
+									</p>
+								</div>
+							</div>
+						</div>
+						<form id="import-form" hx-post="/import" hx-encoding="multipart/form-data" hx-target="body" class="mt-5">
+							<div class="space-y-4">
+								<!-- Companies CSV -->
+								<div>
+									<label for="companies-file" class="block text-sm font-medium text-gray-700">
+										Companies CSV
+									</label>
+									<input
+										type="file"
+										id="companies-file"
+										name="companies"
+										accept=".csv"
+										class="mt-1 block w-full text-sm text-gray-500
+											file:mr-4 file:py-2 file:px-4
+											file:rounded-md file:border-0
+											file:text-sm file:font-semibold
+											file:bg-indigo-50 file:text-indigo-700
+											hover:file:bg-indigo-100"
+									/>
+									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Companies.csv</p>
+								</div>
+								<!-- Roles CSV -->
+								<div>
+									<label for="roles-file" class="block text-sm font-medium text-gray-700">
+										Roles CSV
+									</label>
+									<input
+										type="file"
+										id="roles-file"
+										name="roles"
+										accept=".csv"
+										class="mt-1 block w-full text-sm text-gray-500
+											file:mr-4 file:py-2 file:px-4
+											file:rounded-md file:border-0
+											file:text-sm file:font-semibold
+											file:bg-indigo-50 file:text-indigo-700
+											hover:file:bg-indigo-100"
+									/>
+									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Roles.csv</p>
+								</div>
+								<!-- Interviews CSV -->
+								<div>
+									<label for="interviews-file" class="block text-sm font-medium text-gray-700">
+										Interviews CSV
+									</label>
+									<input
+										type="file"
+										id="interviews-file"
+										name="interviews"
+										accept=".csv"
+										class="mt-1 block w-full text-sm text-gray-500
+											file:mr-4 file:py-2 file:px-4
+											file:rounded-md file:border-0
+											file:text-sm file:font-semibold
+											file:bg-indigo-50 file:text-indigo-700
+											hover:file:bg-indigo-100"
+									/>
+									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Interviews.csv</p>
+								</div>
+								<!-- Contacts CSV -->
+								<div>
+									<label for="contacts-file" class="block text-sm font-medium text-gray-700">
+										Contacts CSV
+									</label>
+									<input
+										type="file"
+										id="contacts-file"
+										name="contacts"
+										accept=".csv"
+										class="mt-1 block w-full text-sm text-gray-500
+											file:mr-4 file:py-2 file:px-4
+											file:rounded-md file:border-0
+											file:text-sm file:font-semibold
+											file:bg-indigo-50 file:text-indigo-700
+											hover:file:bg-indigo-100"
+									/>
+									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - Contacts.csv</p>
+								</div>
+								<!-- InterviewsContacts CSV -->
+								<div>
+									<label for="interviews-contacts-file" class="block text-sm font-medium text-gray-700">
+										Interviews-Contacts CSV
+									</label>
+									<input
+										type="file"
+										id="interviews-contacts-file"
+										name="interviews_contacts"
+										accept=".csv"
+										class="mt-1 block w-full text-sm text-gray-500
+											file:mr-4 file:py-2 file:px-4
+											file:rounded-md file:border-0
+											file:text-sm file:font-semibold
+											file:bg-indigo-50 file:text-indigo-700
+											hover:file:bg-indigo-100"
+									/>
+									<p class="mt-1 text-xs text-gray-500">Expected: reverse-ats - InterviewsContacts.csv</p>
+								</div>
+							</div>
+							<div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+								<button
+									type="submit"
+									class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:col-start-2 sm:text-sm"
+								>
+									Import
+								</button>
+								<button
+									type="button"
+									onclick="closeImportModal()"
+									class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+								>
+									Cancel
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+			<script>
+				function openImportModal() {
+					document.getElementById('import-modal').classList.remove('hidden');
+					document.body.style.overflow = 'hidden';
+				}
+				function closeImportModal() {
+					document.getElementById('import-modal').classList.add('hidden');
+					document.body.style.overflow = 'auto';
+					document.getElementById('import-form').reset();
+				}
+				// Close modal on successful import
+				document.body.addEventListener('htmx:afterSwap', function(event) {
+					if (event.detail.target.id === 'body' && event.detail.xhr.status === 200) {
+						closeImportModal();
+					}
+				});
+			</script>
 		</body>
 	</html>
 }
