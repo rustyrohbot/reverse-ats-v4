@@ -378,8 +378,15 @@ You can also export via the web interface by clicking the **Export** button, whi
 - **Import Order**: The importer automatically handles the correct order (Companies → Roles → Contacts → Interviews → InterviewsContacts)
 - **IDs**: Company and role IDs in your CSV are matched during import
 - **NULL Values**: Use the string "NULL" (all caps) for missing/empty values in CSV files. Both import and export use this convention for consistency.
-- **Dates**: Always use YYYY-MM-DD format (e.g., 2025-01-15) in CSV files. The application will display them in text format (e.g., "January 15, 2025") in the UI.
-- **Times**: Use 24-hour format HH:MM (e.g., 14:30 for 2:30 PM)
+- **Dates**: Both import and export accept/preserve multiple formats:
+  - ISO format: YYYY-MM-DD (e.g., "2025-01-15")
+  - Text format: "Month Day, Year" (e.g., "January 15, 2025" or "April 14, 2025")
+  - Data is stored as-is in the database
+  - UI displays dates in text format regardless of storage format
+- **Times**: Both import and export accept/preserve multiple formats:
+  - 24-hour format: HH:MM (e.g., "14:30")
+  - 12-hour format: HH:MM AM/PM (e.g., "2:30 PM")
+  - Data is stored as-is in the database
 - **Re-importing**: The importer appends data - delete `./data.db` first if you want to start fresh
 - **Round-trip Compatibility**: Files exported via the CLI can be directly re-imported without modification
 
