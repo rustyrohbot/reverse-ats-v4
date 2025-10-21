@@ -2,6 +2,7 @@ package templates
 
 import (
 	"reverse-ats/internal/db"
+	"reverse-ats/internal/util"
 	"fmt"
 )
 
@@ -56,7 +57,7 @@ templ InterviewsList(interviews []db.ListInterviewsWithRoleRow, sortBy, order st
 										{ interview.RoleName }
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
-										{ interview.Date }
+										{ util.FormatDateToText(interview.Date) }
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
 										{ interview.Start }

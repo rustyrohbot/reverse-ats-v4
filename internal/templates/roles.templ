@@ -2,6 +2,7 @@ package templates
 
 import (
 	"reverse-ats/internal/db"
+	"reverse-ats/internal/util"
 	"fmt"
 	"time"
 	"strings"
@@ -13,10 +14,14 @@ func getDateCellStyle(dateStr string) string {
 		return "background-color: #f3f4f6;" // gray-100
 	}
 
-	// Parse "April 8, 2025" format
+	// Try parsing as "April 8, 2025" format first
 	t, err := time.Parse("January 2, 2006", dateStr)
 	if err != nil {
-		return ""
+		// Try parsing as ISO format "2025-04-08"
+		t, err = time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return ""
+		}
 	}
 
 	daysSince := int(time.Since(t).Hours() / 24)
@@ -223,14 +228,14 @@ templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 									</td>
 									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getDateCellStyle(role.AppliedDate.String) }>
 										if role.AppliedDate.Valid {
-											{ role.AppliedDate.String }
+											{ util.FormatDateToText(role.AppliedDate.String) }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
 									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.ClosedDate.Valid) }>
 										if role.ClosedDate.Valid {
-											{ role.ClosedDate.String }
+											{ util.FormatDateToText(role.ClosedDate.String) }
 										} else {
 											<span class="text-gray-400">—</span>
 										}

@@ -29,6 +29,8 @@ type StatsData struct {
 	DateRange            string
 	StartDate            string
 	EndDate              string
+	FirstApplicationDate string
+	LastApplicationDate  string
 }
 
 templ Stats(stats StatsData) {
@@ -112,6 +114,17 @@ templ Stats(stats StatsData) {
 					</button>
 				</form>
 			</div>
+			<!-- Application Date Range -->
+			if stats.FirstApplicationDate != "" && stats.LastApplicationDate != "" {
+				<div class="bg-white shadow-sm rounded-lg p-6 mb-6">
+					<h2 class="text-lg font-semibold text-gray-900 mb-2">Application Period</h2>
+					<p class="text-sm text-gray-700">
+						<span class="font-medium">First application:</span> { stats.FirstApplicationDate }
+						<span class="mx-2">•</span>
+						<span class="font-medium">Last application:</span> { stats.LastApplicationDate }
+					</p>
+				</div>
+			}
 			<!-- Metrics Grid -->
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
 				<!-- Applications -->

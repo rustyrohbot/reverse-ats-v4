@@ -7,6 +7,7 @@ import (
 
 	"reverse-ats/internal/db"
 	"reverse-ats/internal/templates"
+	"reverse-ats/internal/util"
 )
 
 type StatsHandler struct {
@@ -74,14 +75,18 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 		startStr := startDateFilter.Format("2006-01-02")
 		endStr := endDateFilter.Format("2006-01-02")
 
-		// SQL to convert "April 8, 2025" → "2025-04-08"
-		dateConversion := "substr(applied_date, -4) || '-' || " +
+		// SQL to convert dates to ISO format for comparison
+		// Handles both "April 8, 2025" and "2025-04-08" formats
+		dateConversion := "CASE " +
+			"WHEN applied_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN applied_date " +
+			"ELSE substr(applied_date, -4) || '-' || " +
 			"CASE substr(applied_date, 1, instr(applied_date, ' ')-1) " +
 			"WHEN 'January' THEN '01' WHEN 'February' THEN '02' WHEN 'March' THEN '03' " +
 			"WHEN 'April' THEN '04' WHEN 'May' THEN '05' WHEN 'June' THEN '06' " +
 			"WHEN 'July' THEN '07' WHEN 'August' THEN '08' WHEN 'September' THEN '09' " +
 			"WHEN 'October' THEN '10' WHEN 'November' THEN '11' WHEN 'December' THEN '12' END || '-' || " +
-			"printf('%02d', CAST(replace(substr(applied_date, instr(applied_date, ' ')+1, instr(substr(applied_date, instr(applied_date, ' ')+1), ',') - 1), ' ', '') AS INTEGER))"
+			"printf('%02d', CAST(replace(substr(applied_date, instr(applied_date, ' ')+1, instr(substr(applied_date, instr(applied_date, ' ')+1), ',') - 1), ' ', '') AS INTEGER)) " +
+			"END"
 
 		dateClause = " AND (" + dateConversion + ") BETWEEN '" + startStr + "' AND '" + endStr + "'"
 		whereClause = " WHERE applied_date IS NOT NULL AND (" + dateConversion + ") BETWEEN '" + startStr + "' AND '" + endStr + "'"
@@ -91,6 +96,43 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 		DateRange: dateRange,
 		StartDate: startDate,
 		EndDate:   endDate,
+	}
+
+	// Query: First and Last Application Dates
+	// We need to convert dates to ISO format for proper MIN/MAX comparison
+	// Handles both "April 8, 2025" and "2025-04-08" formats
+	dateConversionForMinMax := "CASE " +
+		"WHEN applied_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN applied_date " +
+		"ELSE substr(applied_date, -4) || '-' || " +
+		"CASE substr(applied_date, 1, instr(applied_date, ' ')-1) " +
+		"WHEN 'January' THEN '01' WHEN 'February' THEN '02' WHEN 'March' THEN '03' " +
+		"WHEN 'April' THEN '04' WHEN 'May' THEN '05' WHEN 'June' THEN '06' " +
+		"WHEN 'July' THEN '07' WHEN 'August' THEN '08' WHEN 'September' THEN '09' " +
+		"WHEN 'October' THEN '10' WHEN 'November' THEN '11' WHEN 'December' THEN '12' END || '-' || " +
+		"printf('%02d', CAST(replace(substr(applied_date, instr(applied_date, ' ')+1, instr(substr(applied_date, instr(applied_date, ' ')+1), ',') - 1), ' ', '') AS INTEGER)) " +
+		"END"
+
+	var firstDateQuery, lastDateQuery string
+	if whereClause != "" {
+		// Use subquery to get the original date text for the min/max converted dates
+		firstDateQuery = "SELECT applied_date FROM roles " + whereClause +
+			" ORDER BY (" + dateConversionForMinMax + ") ASC LIMIT 1"
+		lastDateQuery = "SELECT applied_date FROM roles " + whereClause +
+			" ORDER BY (" + dateConversionForMinMax + ") DESC LIMIT 1"
+	} else {
+		firstDateQuery = "SELECT applied_date FROM roles WHERE applied_date IS NOT NULL " +
+			"ORDER BY (" + dateConversionForMinMax + ") ASC LIMIT 1"
+		lastDateQuery = "SELECT applied_date FROM roles WHERE applied_date IS NOT NULL " +
+			"ORDER BY (" + dateConversionForMinMax + ") DESC LIMIT 1"
+	}
+	var firstDate, lastDate sql.NullString
+	h.dbConn.QueryRow(firstDateQuery).Scan(&firstDate)
+	h.dbConn.QueryRow(lastDateQuery).Scan(&lastDate)
+	if firstDate.Valid {
+		stats.FirstApplicationDate = util.FormatDateToText(firstDate.String)
+	}
+	if lastDate.Valid {
+		stats.LastApplicationDate = util.FormatDateToText(lastDate.String)
 	}
 
 	// Query: Roles Applied (count of roles with applied_date in range)
@@ -236,14 +278,18 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 		startStr := startDateFilter.Format("2006-01-02")
 		endStr := endDateFilter.Format("2006-01-02")
 
-		// SQL to convert interview date field "April 8, 2025" → "2025-04-08"
-		interviewDateConversion := "substr(date, -4) || '-' || " +
+		// SQL to convert interview date field to ISO format
+		// Handles both "April 8, 2025" and "2025-04-08" formats
+		interviewDateConversion := "CASE " +
+			"WHEN date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN date " +
+			"ELSE substr(date, -4) || '-' || " +
 			"CASE substr(date, 1, instr(date, ' ')-1) " +
 			"WHEN 'January' THEN '01' WHEN 'February' THEN '02' WHEN 'March' THEN '03' " +
 			"WHEN 'April' THEN '04' WHEN 'May' THEN '05' WHEN 'June' THEN '06' " +
 			"WHEN 'July' THEN '07' WHEN 'August' THEN '08' WHEN 'September' THEN '09' " +
 			"WHEN 'October' THEN '10' WHEN 'November' THEN '11' WHEN 'December' THEN '12' END || '-' || " +
-			"printf('%02d', CAST(replace(substr(date, instr(date, ' ')+1, instr(substr(date, instr(date, ' ')+1), ',') - 1), ' ', '') AS INTEGER))"
+			"printf('%02d', CAST(replace(substr(date, instr(date, ' ')+1, instr(substr(date, instr(date, ' ')+1), ',') - 1), ' ', '') AS INTEGER)) " +
+			"END"
 
 		interviewWhereClause = " WHERE (" + interviewDateConversion + ") BETWEEN '" + startStr + "' AND '" + endStr + "'"
 	}
