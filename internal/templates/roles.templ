@@ -150,7 +150,12 @@ templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "posted_range_max") }</span>
 									</a>
 								</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Equity</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "equity")) } class="group inline-flex hover:text-indigo-600">
+										Equity
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "equity") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
 									<a href={ templ.SafeURL(getSortLink(sortBy, order, "work_city")) } class="group inline-flex hover:text-indigo-600">
 										Work City
@@ -176,7 +181,12 @@ templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 									</a>
 								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Discovery</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Referral</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									<a href={ templ.SafeURL(getSortLink(sortBy, order, "referral")) } class="group inline-flex hover:text-indigo-600">
+										Referral
+										<span class="ml-2 flex-none text-gray-400 group-hover:text-indigo-600">{ getSortIcon(sortBy, order, "referral") }</span>
+									</a>
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900" style="min-width: 500px; max-width: 600px;">Notes</th>
 								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 									<span class="sr-only">Actions</span>

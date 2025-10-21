@@ -31,10 +31,12 @@ func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) {
 		"closed_date":       "r.closed_date",
 		"posted_range_min":  "r.posted_range_min",
 		"posted_range_max":  "r.posted_range_max",
+		"equity":            "r.equity",
 		"work_city":         "r.work_city",
 		"work_state":        "r.work_state",
 		"location":          "r.location",
 		"status":            "r.status",
+		"referral":          "r.referral",
 	}
 
 	sortCol, ok := sortColumnMap[sortBy]
