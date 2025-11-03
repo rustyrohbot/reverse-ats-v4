@@ -122,7 +122,22 @@ func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) error {
 		sortContactsByCompanyName(contacts, order)
 	}
 
-	return templates.ContactsList(contacts, sortBy, order).Render(r.Context(), w)
+	// Fetch companies for inline form dropdown
+	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	if err != nil {
+		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
+		return err
+	}
+
+	companies := make([]models.Company, len(companyRecords))
+	for i, record := range companyRecords {
+		companies[i] = models.Company{
+			ID:   record.Id,
+			Name: record.GetString("name"),
+		}
+	}
+
+	return templates.ContactsList(contacts, sortBy, order, companies).Render(r.Context(), w)
 }
 
 func (h *ContactsHandler) New(w http.ResponseWriter, r *http.Request) error {
@@ -154,7 +169,7 @@ func (h *ContactsHandler) Create(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	record := core.NewRecord(collection)
-	record.Set("company", r.FormValue("company_id"))
+	record.Set("company", r.FormValue("company"))
 	record.Set("first_name", r.FormValue("first_name"))
 	record.Set("last_name", r.FormValue("last_name"))
 	record.Set("role", r.FormValue("role"))
@@ -168,6 +183,19 @@ func (h *ContactsHandler) Create(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	// If HTMX request, return just the new row
+	if r.Header.Get("HX-Request") == "true" {
+		contact := recordToContact(record)
+		// Fetch company name for display
+		if companyID := record.GetString("company"); companyID != "" {
+			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+				contact.CompanyName = companyRecord.GetString("name")
+			}
+		}
+		return templates.ContactRow(contact).Render(r.Context(), w)
+	}
+
+	// Otherwise redirect
 	http.Redirect(w, r, "/contacts", http.StatusSeeOther)
 	return nil
 }
@@ -266,6 +294,13 @@ func (h *ContactsHandler) Delete(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	// If HTMX request, return empty response (row will be removed)
+	if r.Header.Get("HX-Request") == "true" {
+		w.WriteHeader(http.StatusOK)
+		return nil
+	}
+
+	// Otherwise redirect
 	http.Redirect(w, r, "/contacts", http.StatusSeeOther)
 	return nil
 }

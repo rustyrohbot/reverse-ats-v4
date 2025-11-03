@@ -5,17 +5,83 @@ import (
 	"fmt"
 )
 
-templ ContactsList(contacts []models.Contact, sortBy, order string) {
+templ ContactRow(contact models.Contact) {
+	<tr class="hover:bg-gray-50 divide-x divide-gray-200" id={ fmt.Sprintf("contact-%s", contact.ID) }>
+		<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-6">
+			{ contact.CompanyName }
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+			{ contact.FirstName }
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+			{ contact.LastName }
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+			if contact.Role != "" {
+				{ contact.Role }
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+			if contact.Email != "" {
+				<a href={ templ.SafeURL("mailto:" + contact.Email) } class="text-indigo-600 hover:text-indigo-900">
+					{ contact.Email }
+				</a>
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+			if contact.Phone != "" {
+				<a href={ templ.SafeURL("tel:" + contact.Phone) } class="text-indigo-600 hover:text-indigo-900">
+					{ contact.Phone }
+				</a>
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="px-3 py-4 text-sm max-w-xs">
+			if contact.Linkedin != "" {
+				<a href={ templ.SafeURL(contact.Linkedin) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+					{ contact.Linkedin }
+				</a>
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="px-3 py-4 text-sm text-gray-500">
+			<div class="max-h-20 overflow-y-auto max-w-md">
+				if contact.Notes != "" {
+					{ contact.Notes }
+				} else {
+					<span class="text-gray-400">—</span>
+				}
+			</div>
+		</td>
+		<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+			<a href={ templ.SafeURL(fmt.Sprintf("/contacts/%s/edit", contact.ID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+				Edit
+			</a>
+			<button
+				hx-delete={ fmt.Sprintf("/contacts/%s", contact.ID) }
+				hx-confirm="Are you sure you want to delete this contact?"
+				hx-target={ fmt.Sprintf("#contact-%s", contact.ID) }
+				hx-swap="outerHTML swap:1s"
+				class="text-red-600 hover:text-red-900"
+			>
+				Delete
+			</button>
+		</td>
+	</tr>
+}
+
+templ ContactsList(contacts []models.Contact, sortBy, order string, companies []models.Company) {
 	@Layout("Contacts") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
 				<h1 class="text-2xl font-semibold text-gray-900">Contacts</h1>
-				<p class="mt-2 text-sm text-gray-700">Recruiters and hiring managers you've connected with.</p>
-			</div>
-			<div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-				<a href="/contacts/new" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 inline-block">
-					Add contact
-				</a>
+				<p class="mt-2 text-sm text-gray-700">{ fmt.Sprintf("%d contacts tracked", len(contacts)) }</p>
 			</div>
 		</div>
 		<div class="mt-8 flow-root">
@@ -53,74 +119,98 @@ templ ContactsList(contacts []models.Contact, sortBy, order string) {
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-gray-200 bg-white">
-							for _, contact := range contacts {
-								<tr class="hover:bg-gray-50 divide-x divide-gray-200">
-									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-6">
-										{ contact.CompanyName }
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
-										{ contact.FirstName }
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
-										{ contact.LastName }
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if contact.Role != "" {
-											{ contact.Role }
-										} else {
-											<span class="text-gray-400">—</span>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if contact.Email != "" {
-											<a href={ templ.SafeURL("mailto:" + contact.Email) } class="text-indigo-600 hover:text-indigo-900">
-												{ contact.Email }
-											</a>
-										} else {
-											<span class="text-gray-400">—</span>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if contact.Phone != "" {
-											<a href={ templ.SafeURL("tel:" + contact.Phone) } class="text-indigo-600 hover:text-indigo-900">
-												{ contact.Phone }
-											</a>
-										} else {
-											<span class="text-gray-400">—</span>
-										}
-									</td>
-									<td class="px-3 py-4 text-sm max-w-xs">
-										if contact.Linkedin != "" {
-											<a href={ templ.SafeURL(contact.Linkedin) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
-												{ contact.Linkedin }
-											</a>
-										} else {
-											<span class="text-gray-400">—</span>
-										}
-									</td>
-									<td class="px-3 py-4 text-sm text-gray-500">
-										<div class="max-h-20 overflow-y-auto max-w-md">
-											if contact.Notes != "" {
-												{ contact.Notes }
-											} else {
-												<span class="text-gray-400">—</span>
-											}
-										</div>
-									</td>
-									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/contacts/%s/edit", contact.ID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
-											Edit
-										</a>
-										<button
-											hx-delete={ fmt.Sprintf("/contacts/%s", contact.ID) }
-											hx-confirm="Are you sure you want to delete this contact?"
-											hx-target="body"
-											class="text-red-600 hover:text-red-900"
+							<!-- Inline add form -->
+							<tr class="bg-blue-50 divide-x divide-gray-200" id="contact-form-row">
+								<form
+									hx-post="/contacts"
+									hx-target="#contact-form-row"
+									hx-swap="afterend"
+									hx-on::after-request="this.reset()"
+									class="contents"
+								>
+									<td class="py-4 pl-4 pr-3 text-sm sm:pl-6">
+										<select
+											name="company"
+											required
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
 										>
-											Delete
+											<option value="">Company *</option>
+											for _, company := range companies {
+												<option value={ company.ID }>{ company.Name }</option>
+											}
+										</select>
+									</td>
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="text"
+											name="first_name"
+											placeholder="First name *"
+											required
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
+									</td>
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="text"
+											name="last_name"
+											placeholder="Last name *"
+											required
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
+									</td>
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="text"
+											name="role"
+											placeholder="Role"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
+									</td>
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="email"
+											name="email"
+											placeholder="Email"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
+									</td>
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="tel"
+											name="phone"
+											placeholder="Phone"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
+									</td>
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="url"
+											name="linkedin"
+											placeholder="LinkedIn URL"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
+									</td>
+									<td class="px-3 py-4 text-sm">
+										<textarea
+											name="notes"
+											placeholder="Notes"
+											rows="1"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										></textarea>
+									</td>
+									<td class="py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+										<button
+											type="submit"
+											class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+										>
+											Add
 										</button>
 									</td>
-								</tr>
+								</form>
+							</tr>
+							<!-- Existing contacts -->
+							for _, contact := range contacts {
+								@ContactRow(contact)
 							}
 						</tbody>
 					</table>

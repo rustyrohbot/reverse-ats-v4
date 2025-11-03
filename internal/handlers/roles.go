@@ -141,7 +141,22 @@ func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 		sortRolesByCompanyName(roles, order)
 	}
 
-	return templates.RolesList(roles, sortBy, order).Render(r.Context(), w)
+	// Fetch companies for inline form dropdown
+	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	if err != nil {
+		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
+		return err
+	}
+
+	companies := make([]models.Company, len(companyRecords))
+	for i, record := range companyRecords {
+		companies[i] = models.Company{
+			ID:   record.Id,
+			Name: record.GetString("name"),
+		}
+	}
+
+	return templates.RolesList(roles, sortBy, order, companies).Render(r.Context(), w)
 }
 
 func (h *RolesHandler) New(w http.ResponseWriter, r *http.Request) error {
@@ -173,7 +188,7 @@ func (h *RolesHandler) Create(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	record := core.NewRecord(collection)
-	record.Set("company", r.FormValue("company_id"))
+	record.Set("company", r.FormValue("company"))
 	record.Set("name", r.FormValue("name"))
 	record.Set("url", r.FormValue("url"))
 	record.Set("description", r.FormValue("description"))
@@ -206,6 +221,13 @@ func (h *RolesHandler) Create(w http.ResponseWriter, r *http.Request) error {
 	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to create role", http.StatusInternalServerError)
 		return err
+	}
+
+	// If HTMX request, tell it to reload the page
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/roles")
+		w.WriteHeader(http.StatusOK)
+		return nil
 	}
 
 	http.Redirect(w, r, "/roles", http.StatusSeeOther)
@@ -331,6 +353,13 @@ func (h *RolesHandler) Delete(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	// If HTMX request, return empty response (row will be removed)
+	if r.Header.Get("HX-Request") == "true" {
+		w.WriteHeader(http.StatusOK)
+		return nil
+	}
+
+	// Otherwise redirect
 	http.Redirect(w, r, "/roles", http.StatusSeeOther)
 	return nil
 }

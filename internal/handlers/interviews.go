@@ -131,7 +131,32 @@ func (h *InterviewsHandler) List(w http.ResponseWriter, r *http.Request) error {
 		sortInterviewsByCompanyName(interviews, order)
 	}
 
-	return templates.InterviewsList(interviews, sortBy, order).Render(r.Context(), w)
+	// Fetch roles with company info for inline form dropdown
+	roleRecords, err := h.app.FindRecordsByFilter("roles", "", "name", -1, 0)
+	if err != nil {
+		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
+		return err
+	}
+
+	// Convert to Role format with company names
+	roles := make([]models.Role, len(roleRecords))
+	for i, record := range roleRecords {
+		role := models.Role{
+			ID:        record.Id,
+			Name:      record.GetString("name"),
+			CompanyID: record.GetString("company"),
+		}
+
+		// Fetch company name
+		if companyID := record.GetString("company"); companyID != "" {
+			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+				role.CompanyName = companyRecord.GetString("name")
+			}
+		}
+		roles[i] = role
+	}
+
+	return templates.InterviewsList(interviews, sortBy, order, roles).Render(r.Context(), w)
 }
 
 func (h *InterviewsHandler) New(w http.ResponseWriter, r *http.Request) error {
@@ -176,7 +201,7 @@ func (h *InterviewsHandler) Create(w http.ResponseWriter, r *http.Request) error
 	}
 
 	record := core.NewRecord(collection)
-	record.Set("role", r.FormValue("role_id"))
+	record.Set("role", r.FormValue("role"))
 	record.Set("date", r.FormValue("date"))
 	record.Set("start", r.FormValue("start"))
 	record.Set("end", r.FormValue("end"))
@@ -189,6 +214,29 @@ func (h *InterviewsHandler) Create(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
+	// If HTMX request, return just the new row
+	if r.Header.Get("HX-Request") == "true" {
+		interview := recordToInterview(record)
+
+		// Fetch role to get role name and company info
+		if roleID := record.GetString("role"); roleID != "" {
+			if roleRecord, err := h.app.FindRecordById("roles", roleID); err == nil {
+				interview.RoleName = roleRecord.GetString("name")
+				interview.CompanyID = roleRecord.GetString("company")
+
+				// Fetch company name
+				if companyID := roleRecord.GetString("company"); companyID != "" {
+					if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+						interview.CompanyName = companyRecord.GetString("name")
+					}
+				}
+			}
+		}
+
+		return templates.InterviewRow(interview).Render(r.Context(), w)
+	}
+
+	// Otherwise redirect
 	http.Redirect(w, r, "/interviews", http.StatusSeeOther)
 	return nil
 }
@@ -299,6 +347,13 @@ func (h *InterviewsHandler) Delete(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
+	// If HTMX request, return empty response (row will be removed)
+	if r.Header.Get("HX-Request") == "true" {
+		w.WriteHeader(http.StatusOK)
+		return nil
+	}
+
+	// Otherwise redirect
 	http.Redirect(w, r, "/interviews", http.StatusSeeOther)
 	return nil
 }
