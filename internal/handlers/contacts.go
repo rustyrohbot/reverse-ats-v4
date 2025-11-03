@@ -3,6 +3,8 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -42,6 +44,19 @@ func recordToContact(record *core.Record) models.Contact {
 	return contact
 }
 
+func sortContactsByCompanyName(contacts []models.Contact, order string) {
+	sort.Slice(contacts, func(i, j int) bool {
+		cmpResult := strings.Compare(
+			strings.ToLower(contacts[i].CompanyName),
+			strings.ToLower(contacts[j].CompanyName),
+		)
+		if order == "desc" {
+			return cmpResult > 0
+		}
+		return cmpResult < 0
+	})
+}
+
 func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) error {
 	sortBy := r.URL.Query().Get("sort")
 	order := r.URL.Query().Get("order")
@@ -61,10 +76,19 @@ func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) error {
 		order = "asc"
 	}
 
-	// Build sort string
-	sortField := sortBy
-	if order == "desc" {
-		sortField = "-" + sortBy
+	// For company_name sorting, we need to fetch all and sort in memory
+	// For other fields, we can use PocketBase's native sorting
+	var sortField string
+	doInMemorySort := (sortBy == "company_name")
+
+	if !doInMemorySort {
+		sortField = sortBy
+		if order == "desc" {
+			sortField = "-" + sortBy
+		}
+	} else {
+		// No sort for in-memory sorting
+		sortField = ""
 	}
 
 	// Fetch contacts
@@ -91,6 +115,11 @@ func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 		contacts[i] = contact
+	}
+
+	// Sort in memory if needed
+	if doInMemorySort {
+		sortContactsByCompanyName(contacts, order)
 	}
 
 	return templates.ContactsList(contacts, sortBy, order).Render(r.Context(), w)

@@ -52,13 +52,13 @@ func (h *ExportHandler) Export(w http.ResponseWriter, r *http.Request) error {
 		var records []*core.Record
 		switch step.name {
 		case "companies":
-			records, err = h.app.FindRecordsByFilter("companies", "", "created", -1, 0)
+			records, err = h.app.FindRecordsByFilter("companies", "", "id", -1, 0)
 		case "roles":
-			records, err = h.app.FindRecordsByFilter("roles", "", "created", -1, 0)
+			records, err = h.app.FindRecordsByFilter("roles", "", "id", -1, 0)
 		case "contacts":
-			records, err = h.app.FindRecordsByFilter("contacts", "", "created", -1, 0)
+			records, err = h.app.FindRecordsByFilter("contacts", "", "id", -1, 0)
 		case "interviews", "interviews-contacts":
-			records, err = h.app.FindRecordsByFilter("interviews", "", "created", -1, 0)
+			records, err = h.app.FindRecordsByFilter("interviews", "", "id", -1, 0)
 		}
 
 		if err != nil {

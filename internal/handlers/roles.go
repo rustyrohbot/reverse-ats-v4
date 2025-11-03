@@ -3,7 +3,9 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -53,6 +55,19 @@ func recordToRole(record *core.Record) models.Role {
 	return role
 }
 
+func sortRolesByCompanyName(roles []models.Role, order string) {
+	sort.Slice(roles, func(i, j int) bool {
+		cmpResult := strings.Compare(
+			strings.ToLower(roles[i].CompanyName),
+			strings.ToLower(roles[j].CompanyName),
+		)
+		if order == "desc" {
+			return cmpResult > 0
+		}
+		return cmpResult < 0
+	})
+}
+
 func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 	sortBy := r.URL.Query().Get("sort")
 	order := r.URL.Query().Get("order")
@@ -80,13 +95,22 @@ func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 		order = "desc"
 	}
 
-	// Build sort string
-	sortField := sortBy
-	if order == "desc" {
-		sortField = "-" + sortBy
+	// For company_name sorting, we need to fetch all and sort in memory
+	// For other fields, we can use PocketBase's native sorting
+	var sortField string
+	doInMemorySort := (sortBy == "company_name")
+
+	if !doInMemorySort {
+		sortField = sortBy
+		if order == "desc" {
+			sortField = "-" + sortBy
+		}
+	} else {
+		// No sort for in-memory sorting
+		sortField = ""
 	}
 
-	// Fetch roles with company relation expanded
+	// Fetch roles
 	records, err := h.app.FindRecordsByFilter(
 		"roles",
 		"",
@@ -99,7 +123,7 @@ func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	// Expand company relations and convert records to Role structs
+	// Convert records to Role structs and fetch company names
 	roles := make([]models.Role, len(records))
 	for i, record := range records {
 		role := recordToRole(record)
@@ -110,6 +134,11 @@ func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 		roles[i] = role
+	}
+
+	// Sort in memory if needed
+	if doInMemorySort {
+		sortRolesByCompanyName(roles, order)
 	}
 
 	return templates.RolesList(roles, sortBy, order).Render(r.Context(), w)

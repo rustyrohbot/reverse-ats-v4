@@ -7,13 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A web application for tracking job applications, interviews, and contacts during a job search - replacing a spreadsheet-based workflow with a user-friendly CRUD interface.
 
 **Tech Stack:**
-- **Backend**: Go (standard library + `net/http`)
+- **Backend**: Go with PocketBase v0.31.0 (as Go package)
 - **Frontend**: HTMX for interactivity
 - **Templating**: templ (type-safe Go templates)
 - **Styling**: Tailwind CSS
-- **Database**: SQLite
-- **Migrations**: goose (github.com/pressly/goose)
-- **SQL Code Generation**: sqlc (github.com/sqlc-dev/sqlc)
+- **Database**: PocketBase (SQLite with built-in type-safe API)
 
 ## Initial Data Schema
 
@@ -57,46 +55,41 @@ The CSV files in this repository represent the initial data export from a spread
 
 ### Database Setup
 ```bash
-# Install goose CLI (optional, can use programmatically)
-go install github.com/pressly/goose/v3/cmd/goose@latest
+# Reset database (delete data directory)
+rm -rf pb_data
 
-# Run migrations
-goose -dir migrations sqlite3 ./data.db up
+# PocketBase auto-migrates on startup using pb_migrations/
+# Create new migrations by editing pb_migrations/ files
 
-# Create a new migration
-goose -dir migrations create migration_name sql
-
-# Reset database
-goose -dir migrations sqlite3 ./data.db down
-# or
-rm -f data.db && goose -dir migrations sqlite3 ./data.db up
-
-# Check migration status
-goose -dir migrations sqlite3 ./data.db status
+# Access PocketBase admin UI
+# Navigate to http://localhost:5627/_/
 ```
 
 ### Running the Application
 ```bash
-# Run development server with hot reload (if using air)
-air
-
 # Run directly
 go run cmd/server/main.go
+
+# Or using make
+make run
 ```
 
 ### Building
 ```bash
-# Generate all code (run this after changing SQL queries or templates)
+# Generate templ templates (run this after changing .templ files)
 make generate
 # or manually:
-sqlc generate          # Generate Go code from SQL queries
-templ generate         # Generate Go code from templ templates
+templ generate
 
 # Build CSS with Tailwind
 npx tailwindcss -i ./static/input.css -o ./static/output.css --watch
+# or using npm scripts:
+npm run watch:css
 
 # Build application
 go build -o bin/server cmd/server/main.go
+# or using make:
+make build
 ```
 
 ### Testing
@@ -121,19 +114,17 @@ go test ./internal/handlers
 │   └── export/          # CLI export utility
 ├── internal/
 │   ├── handlers/        # HTTP handlers
-│   ├── db/              # sqlc generated database code
-│   ├── database/        # Database connection setup
+│   ├── models/          # Domain models
 │   ├── importer/        # Shared CSV import logic
 │   ├── exporter/        # Shared CSV export logic
 │   ├── util/            # Shared utilities (date formatting, etc.)
 │   └── templates/       # templ template files
-├── migrations/          # goose SQL migration files
-├── queries/             # SQL queries for sqlc
+├── pb_migrations/       # PocketBase schema migrations
+├── pb_data/             # PocketBase data directory (gitignored)
 ├── static/              # CSS, JS, and static assets
 ├── import/              # CSV files for import (gitignored)
 ├── export/              # Exported CSV files (gitignored)
-├── sample_data/         # Sample CSV files for reference
-└── sqlc.yaml            # sqlc configuration
+└── sample_data/         # Sample CSV files for reference
 ```
 
 ### HTMX Patterns
@@ -142,27 +133,35 @@ go test ./internal/handlers
 - Use `hx-target` and `hx-swap` for DOM manipulation
 - Leverage `hx-trigger` for interactive events
 
-### Database Access with sqlc
-- Write SQL queries in `queries/*.sql` files
-- Use sqlc annotations for type-safe query generation:
-  ```sql
-  -- name: GetCompany :one
-  SELECT * FROM companies WHERE company_id = ?;
-
-  -- name: ListCompanies :many
-  SELECT * FROM companies ORDER BY name;
-
-  -- name: CreateCompany :execresult
-  INSERT INTO companies (name, url, hq_city, hq_state)
-  VALUES (?, ?, ?, ?);
-  ```
-- Run `sqlc generate` to create type-safe Go code in `internal/db/`
-- Use generated `Queries` struct in handlers:
+### Database Access with PocketBase
+- PocketBase provides a type-safe API for database operations
+- Collections are defined in `pb_migrations/` files
+- Access records via PocketBase app instance:
   ```go
-  queries := db.New(dbConn)
-  company, err := queries.GetCompany(ctx, companyID)
+  // Find collection
+  collection, err := app.FindCollectionByNameOrId("companies")
+
+  // Create record
+  record := core.NewRecord(collection)
+  record.Set("name", "Company Name")
+  record.Set("url", "https://example.com")
+  err := app.Save(record)
+
+  // Find record
+  record, err := app.FindRecordById("companies", recordId)
+
+  // Find all records with filter
+  records, err := app.FindRecordsByFilter("companies", "name ~ 'Tech'", "-created", 100)
+
+  // Update record
+  record.Set("name", "Updated Name")
+  err := app.Save(record)
+
+  // Delete record
+  err := app.Delete(record)
   ```
-- Handle NULL values using `sql.Null*` types or custom nullable types
+- PocketBase handles NULL values automatically with empty strings
+- Use relation fields for foreign keys (automatic cascade delete support)
 
 ### Template Rendering
 - Use templ for type-safe template generation
@@ -198,7 +197,8 @@ go test ./internal/handlers
   - NULL values are consistently written as "NULL" string
 
 ### Date Handling
-- Dates are stored in the database in both formats (legacy text and ISO)
+- PocketBase DateField stores dates in ISO format (YYYY-MM-DD)
 - CSV files must use ISO format (YYYY-MM-DD)
+- The importer converts text format dates like "April 14, 2025" to ISO format automatically
 - UI displays dates in text format using `internal/util/dateformat.go`
-- SQL queries use date conversion to handle both formats for filtering/sorting
+- PocketBase handles date filtering and sorting natively
