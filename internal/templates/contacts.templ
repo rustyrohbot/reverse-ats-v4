@@ -1,11 +1,11 @@
 package templates
 
 import (
-	"reverse-ats/internal/models"
+	"reverse-ats/internal/db"
 	"fmt"
 )
 
-templ ContactsList(contacts []models.Contact, sortBy, order string) {
+templ ContactsList(contacts []db.ListContactsWithCompanyRow, sortBy, order string) {
 	@Layout("Contacts") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -65,34 +65,34 @@ templ ContactsList(contacts []models.Contact, sortBy, order string) {
 										{ contact.LastName }
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if contact.Role != "" {
-											{ contact.Role }
+										if contact.Role.Valid {
+											{ contact.Role.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if contact.Email != "" {
-											<a href={ templ.SafeURL("mailto:" + contact.Email) } class="text-indigo-600 hover:text-indigo-900">
-												{ contact.Email }
+										if contact.Email.Valid {
+											<a href={ templ.SafeURL("mailto:" + contact.Email.String) } class="text-indigo-600 hover:text-indigo-900">
+												{ contact.Email.String }
 											</a>
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if contact.Phone != "" {
-											<a href={ templ.SafeURL("tel:" + contact.Phone) } class="text-indigo-600 hover:text-indigo-900">
-												{ contact.Phone }
+										if contact.Phone.Valid {
+											<a href={ templ.SafeURL("tel:" + contact.Phone.String) } class="text-indigo-600 hover:text-indigo-900">
+												{ contact.Phone.String }
 											</a>
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
 									<td class="px-3 py-4 text-sm max-w-xs">
-										if contact.Linkedin != "" {
-											<a href={ templ.SafeURL(contact.Linkedin) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
-												{ contact.Linkedin }
+										if contact.Linkedin.Valid {
+											<a href={ templ.SafeURL(contact.Linkedin.String) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+												{ contact.Linkedin.String }
 											</a>
 										} else {
 											<span class="text-gray-400">—</span>
@@ -100,19 +100,19 @@ templ ContactsList(contacts []models.Contact, sortBy, order string) {
 									</td>
 									<td class="px-3 py-4 text-sm text-gray-500">
 										<div class="max-h-20 overflow-y-auto max-w-md">
-											if contact.Notes != "" {
-												{ contact.Notes }
+											if contact.Notes.Valid {
+												{ contact.Notes.String }
 											} else {
 												<span class="text-gray-400">—</span>
 											}
 										</div>
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/contacts/%s/edit", contact.ID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+										<a href={ templ.SafeURL(fmt.Sprintf("/contacts/%d/edit", contact.ContactID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
 											Edit
 										</a>
 										<button
-											hx-delete={ fmt.Sprintf("/contacts/%s", contact.ID) }
+											hx-delete={ fmt.Sprintf("/contacts/%d", contact.ContactID) }
 											hx-confirm="Are you sure you want to delete this contact?"
 											hx-target="body"
 											class="text-red-600 hover:text-red-900"

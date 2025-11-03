@@ -1,7 +1,7 @@
 package templates
 
 import (
-	"reverse-ats/internal/models"
+	"reverse-ats/internal/db"
 	"reverse-ats/internal/util"
 	"fmt"
 	"time"
@@ -67,8 +67,8 @@ func getLocationCellStyle(location string) string {
 }
 
 // Helper function to check if location is REMOTE for work city/state
-func getRemoteCellStyle(location string, value string) string {
-	if value == "" {
+func getRemoteCellStyle(location string, valid bool) string {
+	if !valid {
 		return "background-color: #f3f4f6;" // gray-100
 	}
 	if strings.ToUpper(location) == "REMOTE" {
@@ -89,14 +89,14 @@ func getStatusCellStyle(status string) string {
 }
 
 // Helper function to check if value is null/empty
-func getNullCellStyle(value string) string {
-	if value == "" {
+func getNullCellStyle(valid bool) string {
+	if !valid {
 		return "background-color: #f3f4f6;" // gray-100
 	}
 	return ""
 }
 
-templ RolesList(roles []models.Role, sortBy, order string) {
+templ RolesList(roles []db.ListRolesWithCompanyRow, sortBy, order string) {
 	@Layout("Roles") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -200,134 +200,142 @@ templ RolesList(roles []models.Role, sortBy, order string) {
 										{ role.CompanyName }
 									</td>
 									<td class="whitespace-nowrap px-3 py-2 text-xs font-medium text-gray-900">
-										{ role.Name }
+										{ role.RoleName }
 									</td>
 									<td class="px-3 py-2 text-xs max-w-xs">
-										if role.Url != "" {
-											<a href={ templ.SafeURL(role.Url) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
-												{ role.Url }
+										if role.Url.Valid {
+											<a href={ templ.SafeURL(role.Url.String) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+												{ role.Url.String }
 											</a>
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.Description) }>
+									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.Description.Valid) }>
 										<div class="max-h-20 overflow-y-auto">
-											if role.Description != "" {
-												{ role.Description }
+											if role.Description.Valid {
+												{ role.Description.String }
 											} else {
 												<span class="text-gray-400">—</span>
 											}
 										</div>
 									</td>
-									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.CoverLetter) }>
+									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.CoverLetter.Valid) }>
 										<div class="max-h-20 overflow-y-auto">
-											if role.CoverLetter != "" {
-												{ role.CoverLetter }
+											if role.CoverLetter.Valid {
+												{ role.CoverLetter.String }
 											} else {
 												<span class="text-gray-400">—</span>
 											}
 										</div>
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.ApplicationLocation) }>
-										if role.ApplicationLocation != "" {
-											{ role.ApplicationLocation }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.ApplicationLocation.Valid) }>
+										if role.ApplicationLocation.Valid {
+											{ role.ApplicationLocation.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getDateCellStyle(role.AppliedDate) }>
-										if role.AppliedDate != "" {
-											{ util.FormatDateToText(role.AppliedDate) }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getDateCellStyle(role.AppliedDate.String) }>
+										if role.AppliedDate.Valid {
+											{ util.FormatDateToText(role.AppliedDate.String) }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.ClosedDate) }>
-										if role.ClosedDate != "" {
-											{ util.FormatDateToText(role.ClosedDate) }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.ClosedDate.Valid) }>
+										if role.ClosedDate.Valid {
+											{ util.FormatDateToText(role.ClosedDate.String) }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getSalaryCellStyle(role.PostedRangeMin) }>
-										if role.PostedRangeMin != 0 {
-											{ fmt.Sprintf("$%dk", role.PostedRangeMin/1000) }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getSalaryCellStyle(role.PostedRangeMin.Int64) }>
+										if role.PostedRangeMin.Valid {
+											{ fmt.Sprintf("$%dk", role.PostedRangeMin.Int64/1000) }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getSalaryCellStyle(role.PostedRangeMax) }>
-										if role.PostedRangeMax != 0 {
-											{ fmt.Sprintf("$%dk", role.PostedRangeMax/1000) }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getSalaryCellStyle(role.PostedRangeMax.Int64) }>
+										if role.PostedRangeMax.Valid {
+											{ fmt.Sprintf("$%dk", role.PostedRangeMax.Int64/1000) }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
-										if role.Equity {
-											<span class="text-green-600" aria-label="Equity offered">✓</span>
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Equity.Valid) }>
+										if role.Equity.Valid {
+											if role.Equity.Bool {
+												<span class="text-green-600" aria-label="Equity offered">✓</span>
+											} else {
+												<span class="text-red-600" aria-label="No equity">✗</span>
+											}
 										} else {
-											<span class="text-red-600" aria-label="No equity">✗</span>
+											<span class="text-gray-400" aria-label="Not specified">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getRemoteCellStyle(role.Location, role.WorkCity) }>
-										if role.WorkCity != "" {
-											{ role.WorkCity }
-										} else {
-											<span class="text-gray-400">—</span>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getRemoteCellStyle(role.Location, role.WorkState) }>
-										if role.WorkState != "" {
-											{ role.WorkState }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getRemoteCellStyle(role.Location.String, role.WorkCity.Valid) }>
+										if role.WorkCity.Valid {
+											{ role.WorkCity.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getLocationCellStyle(role.Location) }>
-										if role.Location != "" {
-											{ role.Location }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getRemoteCellStyle(role.Location.String, role.WorkState.Valid) }>
+										if role.WorkState.Valid {
+											{ role.WorkState.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getStatusCellStyle(role.Status) }>
-										if role.Status != "" {
-											{ role.Status }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getLocationCellStyle(role.Location.String) }>
+										if role.Location.Valid {
+											{ role.Location.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Discovery) }>
-										if role.Discovery != "" {
-											{ role.Discovery }
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getStatusCellStyle(role.Status.String) }>
+										if role.Status.Valid {
+											{ role.Status.String }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
-										if role.Referral {
-											<span class="text-green-600" aria-label="Referral">✓</span>
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Discovery.Valid) }>
+										if role.Discovery.Valid {
+											{ role.Discovery.String }
 										} else {
-											<span class="text-red-600" aria-label="No referral">✗</span>
+											<span class="text-gray-400">—</span>
 										}
 									</td>
-									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.Notes) }>
+									<td class="whitespace-nowrap px-3 py-2 text-xs text-gray-500" style={ getNullCellStyle(role.Referral.Valid) }>
+										if role.Referral.Valid {
+											if role.Referral.Bool {
+												<span class="text-green-600" aria-label="Referral">✓</span>
+											} else {
+												<span class="text-red-600" aria-label="No referral">✗</span>
+											}
+										} else {
+											<span class="text-gray-400" aria-label="Not specified">—</span>
+										}
+									</td>
+									<td class="px-3 py-2 text-xs text-gray-500" style={ "min-width: 500px; max-width: 600px; " + getNullCellStyle(role.Notes.Valid) }>
 										<div class="max-h-20 overflow-y-auto">
-											if role.Notes != "" {
-												{ role.Notes }
+											if role.Notes.Valid {
+												{ role.Notes.String }
 											} else {
 												<span class="text-gray-400">—</span>
 											}
 										</div>
 									</td>
 									<td class="relative whitespace-nowrap py-2 pl-3 pr-4 text-right text-xs font-medium sm:pr-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/roles/%s/edit", role.ID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+										<a href={ templ.SafeURL(fmt.Sprintf("/roles/%d/edit", role.RoleID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
 											Edit
 										</a>
 										<button
-											hx-delete={ fmt.Sprintf("/roles/%s", role.ID) }
+											hx-delete={ fmt.Sprintf("/roles/%d", role.RoleID) }
 											hx-confirm="Are you sure you want to delete this role?"
 											hx-target="body"
 											class="text-red-600 hover:text-red-900"
