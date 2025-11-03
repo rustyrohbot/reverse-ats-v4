@@ -50,15 +50,13 @@ func (h *ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 		var query string
 		switch step.name {
 		case "companies":
-			query = "SELECT * FROM companies ORDER BY company_id"
+			records, err = h.app.FindRecordsByFilter("companies", "", "id", -1, 0)
 		case "roles":
-			query = "SELECT * FROM roles ORDER BY role_id"
+			records, err = h.app.FindRecordsByFilter("roles", "", "id", -1, 0)
 		case "contacts":
-			query = "SELECT * FROM contacts ORDER BY contact_id"
-		case "interviews":
-			query = "SELECT * FROM interviews ORDER BY interview_id"
-		case "interviews-contacts":
-			query = "SELECT interviews_contact_id, interview_id, contact_id FROM interviews_contacts ORDER BY interviews_contact_id"
+			records, err = h.app.FindRecordsByFilter("contacts", "", "id", -1, 0)
+		case "interviews", "interviews-contacts":
+			records, err = h.app.FindRecordsByFilter("interviews", "", "id", -1, 0)
 		}
 
 		rows, err := h.dbConn.Query(query)
