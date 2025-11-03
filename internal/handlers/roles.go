@@ -1,264 +1,307 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
+
+	"reverse-ats/internal/models"
 	"reverse-ats/internal/templates"
 )
 
 type RolesHandler struct {
-	queries *db.Queries
-	dbConn  *sql.DB
+	app *pocketbase.PocketBase
 }
 
-func NewRolesHandler(queries *db.Queries, dbConn *sql.DB) *RolesHandler {
-	return &RolesHandler{queries: queries, dbConn: dbConn}
+func NewRolesHandler(app *pocketbase.PocketBase) *RolesHandler {
+	return &RolesHandler{app: app}
 }
 
-func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) {
+func recordToRole(record *core.Record) models.Role {
+	role := models.Role{
+		ID:                  record.Id,
+		CompanyID:           record.GetString("company"),
+		Name:                record.GetString("name"),
+		Url:                 record.GetString("url"),
+		Description:         record.GetString("description"),
+		CoverLetter:         record.GetString("cover_letter"),
+		ApplicationLocation: record.GetString("application_location"),
+		AppliedDate:         record.GetString("applied_date"),
+		ClosedDate:          record.GetString("closed_date"),
+		PostedRangeMin:      int64(record.GetInt("posted_range_min")),
+		PostedRangeMax:      int64(record.GetInt("posted_range_max")),
+		Equity:              record.GetBool("equity"),
+		WorkCity:            record.GetString("work_city"),
+		WorkState:           record.GetString("work_state"),
+		Location:            record.GetString("location"),
+		Status:              record.GetString("status"),
+		Discovery:           record.GetString("discovery"),
+		Referral:            record.GetBool("referral"),
+		Notes:               record.GetString("notes"),
+		CreatedAt:           record.GetDateTime("created").String(),
+		UpdatedAt:           record.GetDateTime("updated").String(),
+	}
+
+	// Get company name from expanded relation
+	if companyRecord := record.ExpandedOne("company"); companyRecord != nil {
+		role.CompanyName = companyRecord.GetString("name")
+	}
+
+	return role
+}
+
+func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 	sortBy := r.URL.Query().Get("sort")
 	order := r.URL.Query().Get("order")
 
-	// Map display names to actual column/field names
-	sortColumnMap := map[string]string{
-		"company_name":      "c.name",
-		"applied_date":      "r.applied_date",
-		"closed_date":       "r.closed_date",
-		"posted_range_min":  "r.posted_range_min",
-		"posted_range_max":  "r.posted_range_max",
-		"equity":            "r.equity",
-		"work_city":         "r.work_city",
-		"work_state":        "r.work_state",
-		"location":          "r.location",
-		"status":            "r.status",
-		"referral":          "r.referral",
+	// Validate sort field
+	validSortFields := map[string]bool{
+		"company_name":     true,
+		"applied_date":     true,
+		"closed_date":      true,
+		"posted_range_min": true,
+		"posted_range_max": true,
+		"equity":           true,
+		"work_city":        true,
+		"work_state":       true,
+		"location":         true,
+		"status":           true,
+		"referral":         true,
 	}
 
-	sortCol, ok := sortColumnMap[sortBy]
-	if !ok {
+	if sortBy == "" || !validSortFields[sortBy] {
 		sortBy = "applied_date"
-		sortCol = "r.applied_date"
 	}
 
 	if order != "asc" && order != "desc" {
 		order = "desc"
 	}
 
-	query := fmt.Sprintf(`
-		SELECT
-			r.role_id,
-			r.company_id,
-			r.name as role_name,
-			r.url,
-			r.description,
-			r.cover_letter,
-			r.application_location,
-			r.applied_date,
-			r.closed_date,
-			r.posted_range_min,
-			r.posted_range_max,
-			r.equity,
-			r.work_city,
-			r.work_state,
-			r.location,
-			r.status,
-			r.discovery,
-			r.referral,
-			r.notes,
-			r.created_at,
-			r.updated_at,
-			c.name as company_name
-		FROM roles r
-		INNER JOIN companies c ON r.company_id = c.company_id
-		ORDER BY %s %s`, sortCol, strings.ToUpper(order))
+	// Build sort string
+	sortField := sortBy
+	if order == "desc" {
+		sortField = "-" + sortBy
+	}
 
-	rows, err := h.dbConn.QueryContext(r.Context(), query)
+	// Fetch roles with company relation expanded
+	records, err := h.app.FindRecordsByFilter(
+		"roles",
+		"",
+		sortField,
+		-1, // all records
+		0,
+	)
 	if err != nil {
 		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
-		return
+		return err
 	}
-	defer rows.Close()
 
-	var roles []db.ListRolesWithCompanyRow
-	for rows.Next() {
-		var role db.ListRolesWithCompanyRow
-		err := rows.Scan(
-			&role.RoleID,
-			&role.CompanyID,
-			&role.RoleName,
-			&role.Url,
-			&role.Description,
-			&role.CoverLetter,
-			&role.ApplicationLocation,
-			&role.AppliedDate,
-			&role.ClosedDate,
-			&role.PostedRangeMin,
-			&role.PostedRangeMax,
-			&role.Equity,
-			&role.WorkCity,
-			&role.WorkState,
-			&role.Location,
-			&role.Status,
-			&role.Discovery,
-			&role.Referral,
-			&role.Notes,
-			&role.CreatedAt,
-			&role.UpdatedAt,
-			&role.CompanyName,
-		)
-		if err != nil {
-			http.Error(w, "Failed to scan roles", http.StatusInternalServerError)
-			return
+	// Expand company relations and convert records to Role structs
+	roles := make([]models.Role, len(records))
+	for i, record := range records {
+		role := recordToRole(record)
+		// Manually fetch company name
+		if companyID := record.GetString("company"); companyID != "" {
+			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+				role.CompanyName = companyRecord.GetString("name")
+			}
 		}
-		roles = append(roles, role)
+		roles[i] = role
 	}
 
-	templates.RolesList(roles, sortBy, order).Render(r.Context(), w)
+	return templates.RolesList(roles, sortBy, order).Render(r.Context(), w)
 }
 
-func (h *RolesHandler) New(w http.ResponseWriter, r *http.Request) {
-	companies, err := h.queries.ListCompanies(r.Context())
+func (h *RolesHandler) New(w http.ResponseWriter, r *http.Request) error {
+	// Fetch companies for dropdown
+	records, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	templates.RoleFormNew(companies).Render(r.Context(), w)
+	companies := make([]models.Company, len(records))
+	for i, record := range records {
+		companies[i] = recordToCompany(record)
+	}
+
+	return templates.RoleFormNew(companies).Render(r.Context(), w)
 }
 
-func (h *RolesHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *RolesHandler) Create(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
+		return err
 	}
 
-	companyID, err := strconv.ParseInt(r.FormValue("company_id"), 10, 64)
+	collection, err := h.app.FindCollectionByNameOrId("roles")
 	if err != nil {
-		http.Error(w, "Invalid company ID", http.StatusBadRequest)
-		return
+		http.Error(w, "Failed to find collection", http.StatusInternalServerError)
+		return err
 	}
 
-	_, err = h.queries.CreateRole(r.Context(), db.CreateRoleParams{
-		CompanyID:           companyID,
-		Name:                r.FormValue("name"),
-		Url:                 nullString(r.FormValue("url")),
-		Description:         nullString(r.FormValue("description")),
-		CoverLetter:         nullString(r.FormValue("cover_letter")),
-		ApplicationLocation: nullString(r.FormValue("application_location")),
-		AppliedDate:         nullString(r.FormValue("applied_date")),
-		ClosedDate:          nullString(r.FormValue("closed_date")),
-		PostedRangeMin:      nullInt64(r.FormValue("posted_range_min")),
-		PostedRangeMax:      nullInt64(r.FormValue("posted_range_max")),
-		Equity:              nullBool(r.FormValue("equity")),
-		WorkCity:            nullString(r.FormValue("work_city")),
-		WorkState:           nullString(r.FormValue("work_state")),
-		Location:            nullString(r.FormValue("location")),
-		Status:              nullString(r.FormValue("status")),
-		Discovery:           nullString(r.FormValue("discovery")),
-		Referral:            nullBool(r.FormValue("referral")),
-		Notes:               nullString(r.FormValue("notes")),
-	})
-	if err != nil {
+	record := core.NewRecord(collection)
+	record.Set("company", r.FormValue("company_id"))
+	record.Set("name", r.FormValue("name"))
+	record.Set("url", r.FormValue("url"))
+	record.Set("description", r.FormValue("description"))
+	record.Set("cover_letter", r.FormValue("cover_letter"))
+	record.Set("application_location", r.FormValue("application_location"))
+	record.Set("applied_date", r.FormValue("applied_date"))
+	record.Set("closed_date", r.FormValue("closed_date"))
+
+	// Parse numbers
+	if minStr := r.FormValue("posted_range_min"); minStr != "" {
+		if min, err := strconv.ParseInt(minStr, 10, 64); err == nil {
+			record.Set("posted_range_min", min)
+		}
+	}
+	if maxStr := r.FormValue("posted_range_max"); maxStr != "" {
+		if max, err := strconv.ParseInt(maxStr, 10, 64); err == nil {
+			record.Set("posted_range_max", max)
+		}
+	}
+
+	record.Set("equity", r.FormValue("equity") == "on" || r.FormValue("equity") == "true")
+	record.Set("work_city", r.FormValue("work_city"))
+	record.Set("work_state", r.FormValue("work_state"))
+	record.Set("location", r.FormValue("location"))
+	record.Set("status", r.FormValue("status"))
+	record.Set("discovery", r.FormValue("discovery"))
+	record.Set("referral", r.FormValue("referral") == "on" || r.FormValue("referral") == "true")
+	record.Set("notes", r.FormValue("notes"))
+
+	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to create role", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/roles", http.StatusSeeOther)
+	return nil
 }
 
-func (h *RolesHandler) Edit(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/roles/")
-	idStr = strings.TrimSuffix(idStr, "/edit")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *RolesHandler) Edit(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
-	role, err := h.queries.GetRole(r.Context(), id)
+	record, err := h.app.FindRecordById("roles", id)
 	if err != nil {
 		http.Error(w, "Role not found", http.StatusNotFound)
-		return
+		return err
 	}
 
-	companies, err := h.queries.ListCompanies(r.Context())
+	role := recordToRole(record)
+
+	// Fetch company name for display
+	if companyID := record.GetString("company"); companyID != "" {
+		if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+			role.CompanyName = companyRecord.GetString("name")
+		}
+	}
+
+	// Fetch companies for dropdown
+	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	templates.RoleFormEdit(role, companies).Render(r.Context(), w)
+	companies := make([]models.Company, len(companyRecords))
+	for i, rec := range companyRecords {
+		companies[i] = recordToCompany(rec)
+	}
+
+	return templates.RoleFormEdit(role, companies).Render(r.Context(), w)
 }
 
-func (h *RolesHandler) Update(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/roles/")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *RolesHandler) Update(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
+		return err
 	}
 
-	companyID, err := strconv.ParseInt(r.FormValue("company_id"), 10, 64)
+	record, err := h.app.FindRecordById("roles", id)
 	if err != nil {
-		http.Error(w, "Invalid company ID", http.StatusBadRequest)
-		return
+		http.Error(w, "Role not found", http.StatusNotFound)
+		return err
 	}
 
-	err = h.queries.UpdateRole(r.Context(), db.UpdateRoleParams{
-		CompanyID:           companyID,
-		Name:                r.FormValue("name"),
-		Url:                 nullString(r.FormValue("url")),
-		Description:         nullString(r.FormValue("description")),
-		CoverLetter:         nullString(r.FormValue("cover_letter")),
-		ApplicationLocation: nullString(r.FormValue("application_location")),
-		AppliedDate:         nullString(r.FormValue("applied_date")),
-		ClosedDate:          nullString(r.FormValue("closed_date")),
-		PostedRangeMin:      nullInt64(r.FormValue("posted_range_min")),
-		PostedRangeMax:      nullInt64(r.FormValue("posted_range_max")),
-		Equity:              nullBool(r.FormValue("equity")),
-		WorkCity:            nullString(r.FormValue("work_city")),
-		WorkState:           nullString(r.FormValue("work_state")),
-		Location:            nullString(r.FormValue("location")),
-		Status:              nullString(r.FormValue("status")),
-		Discovery:           nullString(r.FormValue("discovery")),
-		Referral:            nullBool(r.FormValue("referral")),
-		Notes:               nullString(r.FormValue("notes")),
-		RoleID:              id,
-	})
-	if err != nil {
+	record.Set("company", r.FormValue("company_id"))
+	record.Set("name", r.FormValue("name"))
+	record.Set("url", r.FormValue("url"))
+	record.Set("description", r.FormValue("description"))
+	record.Set("cover_letter", r.FormValue("cover_letter"))
+	record.Set("application_location", r.FormValue("application_location"))
+	record.Set("applied_date", r.FormValue("applied_date"))
+	record.Set("closed_date", r.FormValue("closed_date"))
+
+	// Parse numbers
+	if minStr := r.FormValue("posted_range_min"); minStr != "" {
+		if min, err := strconv.ParseInt(minStr, 10, 64); err == nil {
+			record.Set("posted_range_min", min)
+		}
+	} else {
+		record.Set("posted_range_min", nil)
+	}
+	if maxStr := r.FormValue("posted_range_max"); maxStr != "" {
+		if max, err := strconv.ParseInt(maxStr, 10, 64); err == nil {
+			record.Set("posted_range_max", max)
+		}
+	} else {
+		record.Set("posted_range_max", nil)
+	}
+
+	record.Set("equity", r.FormValue("equity") == "on" || r.FormValue("equity") == "true")
+	record.Set("work_city", r.FormValue("work_city"))
+	record.Set("work_state", r.FormValue("work_state"))
+	record.Set("location", r.FormValue("location"))
+	record.Set("status", r.FormValue("status"))
+	record.Set("discovery", r.FormValue("discovery"))
+	record.Set("referral", r.FormValue("referral") == "on" || r.FormValue("referral") == "true")
+	record.Set("notes", r.FormValue("notes"))
+
+	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to update role", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/roles", http.StatusSeeOther)
+	return nil
 }
 
-func (h *RolesHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/roles/")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *RolesHandler) Delete(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
-	err = h.queries.DeleteRole(r.Context(), id)
+	record, err := h.app.FindRecordById("roles", id)
 	if err != nil {
+		http.Error(w, "Role not found", http.StatusNotFound)
+		return err
+	}
+
+	if err := h.app.Delete(record); err != nil {
 		http.Error(w, "Failed to delete role", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/roles", http.StatusSeeOther)
+	return nil
 }

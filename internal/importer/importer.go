@@ -1,31 +1,55 @@
 package importer
 
 import (
-	"context"
-	"database/sql"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
+	"time"
 
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
 )
 
-// nullString converts "NULL" string to sql.NullString
-func nullString(s string) sql.NullString {
-	if s == "" || s == "NULL" {
-		return sql.NullString{Valid: false}
-	}
-	return sql.NullString{String: s, Valid: true}
+// ID mapping tables to handle conversion from old integer IDs to PocketBase string IDs
+type IDMappings struct {
+	Companies map[string]string // old ID -> new ID
+	Roles     map[string]string
+	Contacts  map[string]string
+	Interviews map[string]string
 }
 
-// NullInt64 converts string to sql.NullInt64
-// Handles currency format like "$130,047.00"
-func NullInt64(s string) sql.NullInt64 {
+func NewIDMappings() *IDMappings {
+	return &IDMappings{
+		Companies: make(map[string]string),
+		Roles:     make(map[string]string),
+		Contacts:  make(map[string]string),
+		Interviews: make(map[string]string),
+	}
+}
+
+// emptyToNull converts empty string or "NULL" to empty string for PocketBase
+func emptyToNull(s string) string {
+	if s == "NULL" {
+		return ""
+	}
+	return s
+}
+
+// parseBool converts string to boolean
+func parseBool(s string) bool {
 	if s == "" || s == "NULL" {
-		return sql.NullInt64{Valid: false}
+		return false
+	}
+	s = strings.ToLower(strings.TrimSpace(s))
+	return s == "true" || s == "yes" || s == "1" || s == "t" || s == "y"
+}
+
+// parseInt64 parses int64 from string, handling currency format
+func parseInt64(s string) int64 {
+	if s == "" || s == "NULL" {
+		return 0
 	}
 
 	// Remove currency symbols, commas, and decimal portions
@@ -37,33 +61,34 @@ func NullInt64(s string) sql.NullInt64 {
 		s = s[:idx]
 	}
 
-	i, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return sql.NullInt64{Valid: false}
-	}
-	return sql.NullInt64{Int64: i, Valid: true}
+	var result int64
+	fmt.Sscanf(s, "%d", &result)
+	return result
 }
 
-// nullBool converts string to sql.NullBool
-func nullBool(s string) sql.NullBool {
+// parseDate converts date string to ISO format (YYYY-MM-DD)
+// Handles both "April 14, 2025" and "2025-04-14" formats
+func parseDate(s string) string {
 	if s == "" || s == "NULL" {
-		return sql.NullBool{Valid: false}
+		return ""
 	}
 
-	// Handle various boolean representations
-	s = strings.ToLower(strings.TrimSpace(s))
-	switch s {
-	case "true", "yes", "1", "t", "y":
-		return sql.NullBool{Bool: true, Valid: true}
-	case "false", "no", "0", "f", "n":
-		return sql.NullBool{Bool: false, Valid: true}
-	default:
-		return sql.NullBool{Valid: false}
+	// Try ISO format first (YYYY-MM-DD)
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t.Format("2006-01-02")
 	}
+
+	// Try text format (January 2, 2006)
+	if t, err := time.Parse("January 2, 2006", s); err == nil {
+		return t.Format("2006-01-02")
+	}
+
+	// Return as-is if can't parse (will likely fail validation)
+	return s
 }
 
 // ImportCompanies imports companies from CSV file
-func ImportCompanies(queries *db.Queries, filepath string) error {
+func ImportCompanies(app *pocketbase.PocketBase, filepath string, mappings *IDMappings) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("failed to open companies CSV: %w", err)
@@ -75,6 +100,11 @@ func ImportCompanies(queries *db.Queries, filepath string) error {
 	// Skip header
 	if _, err := reader.Read(); err != nil {
 		return fmt.Errorf("failed to read header: %w", err)
+	}
+
+	collection, err := app.FindCollectionByNameOrId("companies")
+	if err != nil {
+		return fmt.Errorf("failed to find companies collection: %w", err)
 	}
 
 	count := 0
@@ -93,17 +123,22 @@ func ImportCompanies(queries *db.Queries, filepath string) error {
 		}
 
 		// CSV columns: companyID,name,description,url,linkedin,hqCity,hqState
-		_, err = queries.CreateCompany(context.Background(), db.CreateCompanyParams{
-			Name:        record[1],
-			Description: nullString(record[2]),
-			Url:         nullString(record[3]),
-			Linkedin:    nullString(record[4]),
-			HqCity:      nullString(record[5]),
-			HqState:     nullString(record[6]),
-		})
-		if err != nil {
+		oldID := record[0]
+
+		pbRecord := core.NewRecord(collection)
+		pbRecord.Set("name", record[1])
+		pbRecord.Set("description", emptyToNull(record[2]))
+		pbRecord.Set("url", emptyToNull(record[3]))
+		pbRecord.Set("linkedin", emptyToNull(record[4]))
+		pbRecord.Set("hq_city", emptyToNull(record[5]))
+		pbRecord.Set("hq_state", emptyToNull(record[6]))
+
+		if err := app.Save(pbRecord); err != nil {
 			return fmt.Errorf("failed to insert company %s: %w", record[1], err)
 		}
+
+		// Store ID mapping
+		mappings.Companies[oldID] = pbRecord.Id
 		count++
 	}
 
@@ -112,7 +147,7 @@ func ImportCompanies(queries *db.Queries, filepath string) error {
 }
 
 // ImportContacts imports contacts from CSV file
-func ImportContacts(queries *db.Queries, filepath string) error {
+func ImportContacts(app *pocketbase.PocketBase, filepath string, mappings *IDMappings) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("failed to open contacts CSV: %w", err)
@@ -124,6 +159,11 @@ func ImportContacts(queries *db.Queries, filepath string) error {
 	// Skip header
 	if _, err := reader.Read(); err != nil {
 		return fmt.Errorf("failed to read header: %w", err)
+	}
+
+	collection, err := app.FindCollectionByNameOrId("contacts")
+	if err != nil {
+		return fmt.Errorf("failed to find contacts collection: %w", err)
 	}
 
 	count := 0
@@ -142,24 +182,31 @@ func ImportContacts(queries *db.Queries, filepath string) error {
 		}
 
 		// CSV columns: contactID,companyID,firstName,lastName,role,email,phone,linkedin,notes
-		companyID, err := strconv.ParseInt(record[1], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid company ID %s: %w", record[1], err)
+		oldID := record[0]
+		oldCompanyID := record[1]
+
+		// Map old company ID to new PocketBase ID
+		newCompanyID, ok := mappings.Companies[oldCompanyID]
+		if !ok {
+			return fmt.Errorf("company ID %s not found in mapping for contact %s %s", oldCompanyID, record[2], record[3])
 		}
 
-		_, err = queries.CreateContact(context.Background(), db.CreateContactParams{
-			CompanyID: companyID,
-			FirstName: record[2],
-			LastName:  record[3],
-			Role:      nullString(record[4]),
-			Email:     nullString(record[5]),
-			Phone:     nullString(record[6]),
-			Linkedin:  nullString(record[7]),
-			Notes:     nullString(record[8]),
-		})
-		if err != nil {
+		pbRecord := core.NewRecord(collection)
+		pbRecord.Set("company", newCompanyID)
+		pbRecord.Set("first_name", record[2])
+		pbRecord.Set("last_name", record[3])
+		pbRecord.Set("role", emptyToNull(record[4]))
+		pbRecord.Set("email", emptyToNull(record[5]))
+		pbRecord.Set("phone", emptyToNull(record[6]))
+		pbRecord.Set("linkedin", emptyToNull(record[7]))
+		pbRecord.Set("notes", emptyToNull(record[8]))
+
+		if err := app.Save(pbRecord); err != nil {
 			return fmt.Errorf("failed to insert contact %s %s: %w", record[2], record[3], err)
 		}
+
+		// Store ID mapping
+		mappings.Contacts[oldID] = pbRecord.Id
 		count++
 	}
 
@@ -168,7 +215,7 @@ func ImportContacts(queries *db.Queries, filepath string) error {
 }
 
 // ImportRoles imports roles from CSV file
-func ImportRoles(queries *db.Queries, filepath string) error {
+func ImportRoles(app *pocketbase.PocketBase, filepath string, mappings *IDMappings) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("failed to open roles CSV: %w", err)
@@ -180,6 +227,11 @@ func ImportRoles(queries *db.Queries, filepath string) error {
 	// Skip header
 	if _, err := reader.Read(); err != nil {
 		return fmt.Errorf("failed to read header: %w", err)
+	}
+
+	collection, err := app.FindCollectionByNameOrId("roles")
+	if err != nil {
+		return fmt.Errorf("failed to find roles collection: %w", err)
 	}
 
 	count := 0
@@ -202,38 +254,45 @@ func ImportRoles(queries *db.Queries, filepath string) error {
 		// location,status,discovery,referral,notes
 
 		// Skip rows with empty company ID (malformed CSV)
-		if record[1] == "" {
+		if record[1] == "" || record[1] == "NULL" {
 			continue
 		}
 
-		companyID, err := strconv.ParseInt(record[1], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid company ID %s: %w", record[1], err)
+		oldID := record[0]
+		oldCompanyID := record[1]
+
+		// Map old company ID to new PocketBase ID
+		newCompanyID, ok := mappings.Companies[oldCompanyID]
+		if !ok {
+			return fmt.Errorf("company ID %s not found in mapping for role %s", oldCompanyID, record[2])
 		}
 
-		_, err = queries.CreateRole(context.Background(), db.CreateRoleParams{
-			CompanyID:           companyID,
-			Name:                record[2],
-			Url:                 nullString(record[3]),
-			Description:         nullString(record[4]),
-			CoverLetter:         nullString(record[5]),
-			ApplicationLocation: nullString(record[6]),
-			AppliedDate:         nullString(record[7]),
-			ClosedDate:          nullString(record[8]),
-			PostedRangeMin:      NullInt64(record[9]),
-			PostedRangeMax:      NullInt64(record[10]),
-			Equity:              nullBool(record[11]),
-			WorkCity:            nullString(record[12]),
-			WorkState:           nullString(record[13]),
-			Location:            nullString(record[14]),
-			Status:              nullString(record[15]),
-			Discovery:           nullString(record[16]),
-			Referral:            nullBool(record[17]),
-			Notes:               nullString(record[18]),
-		})
-		if err != nil {
+		pbRecord := core.NewRecord(collection)
+		pbRecord.Set("company", newCompanyID)
+		pbRecord.Set("name", record[2])
+		pbRecord.Set("url", emptyToNull(record[3]))
+		pbRecord.Set("description", emptyToNull(record[4]))
+		pbRecord.Set("cover_letter", emptyToNull(record[5]))
+		pbRecord.Set("application_location", emptyToNull(record[6]))
+		pbRecord.Set("applied_date", parseDate(record[7]))
+		pbRecord.Set("closed_date", parseDate(record[8]))
+		pbRecord.Set("posted_range_min", parseInt64(record[9]))
+		pbRecord.Set("posted_range_max", parseInt64(record[10]))
+		pbRecord.Set("equity", parseBool(record[11]))
+		pbRecord.Set("work_city", emptyToNull(record[12]))
+		pbRecord.Set("work_state", emptyToNull(record[13]))
+		pbRecord.Set("location", emptyToNull(record[14]))
+		pbRecord.Set("status", emptyToNull(record[15]))
+		pbRecord.Set("discovery", emptyToNull(record[16]))
+		pbRecord.Set("referral", parseBool(record[17]))
+		pbRecord.Set("notes", emptyToNull(record[18]))
+
+		if err := app.Save(pbRecord); err != nil {
 			return fmt.Errorf("failed to insert role %s: %w", record[2], err)
 		}
+
+		// Store ID mapping
+		mappings.Roles[oldID] = pbRecord.Id
 		count++
 	}
 
@@ -242,7 +301,7 @@ func ImportRoles(queries *db.Queries, filepath string) error {
 }
 
 // ImportInterviews imports interviews from CSV file
-func ImportInterviews(queries *db.Queries, filepath string) error {
+func ImportInterviews(app *pocketbase.PocketBase, filepath string, mappings *IDMappings) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("failed to open interviews CSV: %w", err)
@@ -254,6 +313,11 @@ func ImportInterviews(queries *db.Queries, filepath string) error {
 	// Skip header
 	if _, err := reader.Read(); err != nil {
 		return fmt.Errorf("failed to read header: %w", err)
+	}
+
+	collection, err := app.FindCollectionByNameOrId("interviews")
+	if err != nil {
+		return fmt.Errorf("failed to find interviews collection: %w", err)
 	}
 
 	count := 0
@@ -272,22 +336,29 @@ func ImportInterviews(queries *db.Queries, filepath string) error {
 		}
 
 		// CSV columns: interviewID,roleID,date,start,end,notes,type
-		roleID, err := strconv.ParseInt(record[1], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid role ID %s: %w", record[1], err)
+		oldID := record[0]
+		oldRoleID := record[1]
+
+		// Map old role ID to new PocketBase ID
+		newRoleID, ok := mappings.Roles[oldRoleID]
+		if !ok {
+			return fmt.Errorf("role ID %s not found in mapping for interview on %s", oldRoleID, record[2])
 		}
 
-		_, err = queries.CreateInterview(context.Background(), db.CreateInterviewParams{
-			RoleID: roleID,
-			Date:   record[2],
-			Start:  record[3],
-			End:    record[4],
-			Notes:  nullString(record[5]),
-			Type:   record[6],
-		})
-		if err != nil {
+		pbRecord := core.NewRecord(collection)
+		pbRecord.Set("role", newRoleID)
+		pbRecord.Set("date", parseDate(record[2]))
+		pbRecord.Set("start", record[3])
+		pbRecord.Set("end", record[4])
+		pbRecord.Set("notes", emptyToNull(record[5]))
+		pbRecord.Set("type", record[6])
+
+		if err := app.Save(pbRecord); err != nil {
 			return fmt.Errorf("failed to insert interview on %s: %w", record[2], err)
 		}
+
+		// Store ID mapping
+		mappings.Interviews[oldID] = pbRecord.Id
 		count++
 	}
 
@@ -296,7 +367,7 @@ func ImportInterviews(queries *db.Queries, filepath string) error {
 }
 
 // ImportInterviewsContacts imports interview-contact relationships from CSV file
-func ImportInterviewsContacts(queries *db.Queries, filepath string) error {
+func ImportInterviewsContacts(app *pocketbase.PocketBase, filepath string, mappings *IDMappings) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("failed to open interviews-contacts CSV: %w", err)
@@ -326,23 +397,44 @@ func ImportInterviewsContacts(queries *db.Queries, filepath string) error {
 		}
 
 		// CSV columns: interviewsContactId,interviewId,contactId
-		interviewID, err := strconv.ParseInt(record[1], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid interview ID %s: %w", record[1], err)
+		oldInterviewID := record[1]
+		oldContactID := record[2]
+
+		// Map old IDs to new PocketBase IDs
+		newInterviewID, ok := mappings.Interviews[oldInterviewID]
+		if !ok {
+			return fmt.Errorf("interview ID %s not found in mapping", oldInterviewID)
 		}
 
-		contactID, err := strconv.ParseInt(record[2], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid contact ID %s: %w", record[2], err)
+		newContactID, ok := mappings.Contacts[oldContactID]
+		if !ok {
+			return fmt.Errorf("contact ID %s not found in mapping", oldContactID)
 		}
 
-		err = queries.LinkInterviewContact(context.Background(), db.LinkInterviewContactParams{
-			InterviewID: interviewID,
-			ContactID:   contactID,
-		})
+		// Fetch the interview record and update its contacts field
+		interview, err := app.FindRecordById("interviews", newInterviewID)
 		if err != nil {
-			return fmt.Errorf("failed to link interview %d with contact %d: %w", interviewID, contactID, err)
+			return fmt.Errorf("failed to find interview %s: %w", newInterviewID, err)
 		}
+
+		// Get existing contacts (if any)
+		existingContacts := interview.GetStringSlice("contacts")
+		// Add new contact if not already present
+		found := false
+		for _, c := range existingContacts {
+			if c == newContactID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			existingContacts = append(existingContacts, newContactID)
+			interview.Set("contacts", existingContacts)
+			if err := app.Save(interview); err != nil {
+				return fmt.Errorf("failed to update interview %s with contact %s: %w", newInterviewID, newContactID, err)
+			}
+		}
+
 		count++
 	}
 
@@ -350,13 +442,12 @@ func ImportInterviewsContacts(queries *db.Queries, filepath string) error {
 	return nil
 }
 
-// ImportAll imports all CSV files from the specified directory
 // ImportStep represents a single import operation
 type ImportStep struct {
 	Name     string
 	Filename string
 	Filepath string
-	Fn       func(*db.Queries, string) error
+	Fn       func(*pocketbase.PocketBase, string, *IDMappings) error
 }
 
 // GetImportSteps returns the import steps in the correct order (respecting foreign keys)
@@ -372,15 +463,18 @@ func GetImportSteps() []ImportStep {
 
 // ImportFromSteps imports data from a list of steps, skipping missing files
 // Returns a list of errors encountered (doesn't stop on first error)
-func ImportFromSteps(queries *db.Queries, steps []ImportStep, skipMissing bool) []error {
+func ImportFromSteps(app *pocketbase.PocketBase, steps []ImportStep, skipMissing bool) []error {
 	var errors []error
+	mappings := NewIDMappings()
 
 	for _, step := range steps {
 		if step.Filepath == "" {
 			if skipMissing {
 				continue
 			}
-			errors = append(errors, fmt.Errorf("%s: no file provided", step.Name))
+			err := fmt.Errorf("%s: no file provided", step.Name)
+			fmt.Printf("ERROR: %v\n", err)
+			errors = append(errors, err)
 			continue
 		}
 
@@ -389,13 +483,17 @@ func ImportFromSteps(queries *db.Queries, steps []ImportStep, skipMissing bool) 
 			if skipMissing {
 				continue
 			}
-			errors = append(errors, fmt.Errorf("%s: file not found: %s", step.Name, step.Filepath))
+			err := fmt.Errorf("%s: file not found: %s", step.Name, step.Filepath)
+			fmt.Printf("ERROR: %v\n", err)
+			errors = append(errors, err)
 			continue
 		}
 
 		fmt.Printf("Importing %s from %s...\n", step.Name, step.Filepath)
-		if err := step.Fn(queries, step.Filepath); err != nil {
-			errors = append(errors, fmt.Errorf("%s: %w", step.Name, err))
+		if err := step.Fn(app, step.Filepath, mappings); err != nil {
+			wrappedErr := fmt.Errorf("%s: %w", step.Name, err)
+			fmt.Printf("ERROR: %v\n", wrappedErr)
+			errors = append(errors, wrappedErr)
 			continue
 		}
 	}
@@ -403,7 +501,7 @@ func ImportFromSteps(queries *db.Queries, steps []ImportStep, skipMissing bool) 
 	return errors
 }
 
-func ImportAll(queries *db.Queries, dir string) error {
+func ImportAll(app *pocketbase.PocketBase, dir string) error {
 	steps := GetImportSteps()
 
 	// Set filepaths for all steps
@@ -421,7 +519,7 @@ func ImportAll(queries *db.Queries, dir string) error {
 	}
 
 	// Import with error collection (but fail on first error for CLI compatibility)
-	errors := ImportFromSteps(queries, steps, false)
+	errors := ImportFromSteps(app, steps, false)
 	if len(errors) > 0 {
 		return errors[0]
 	}

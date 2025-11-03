@@ -5,15 +5,15 @@ import (
 	"log"
 	"os"
 
-	"reverse-ats/internal/database"
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+
 	"reverse-ats/internal/importer"
 )
 
 func main() {
 	// Fixed paths
 	csvDir := "./import"
-	dbPath := "./data.db"
+	dbPath := "./pb_data"
 
 	// Check if directory exists
 	if _, err := os.Stat(csvDir); os.IsNotExist(err) {
@@ -21,20 +21,20 @@ func main() {
 	}
 
 	fmt.Printf("Importing CSV files from: %s\n", csvDir)
-	fmt.Printf("Database: %s\n\n", dbPath)
+	fmt.Printf("PocketBase data directory: %s\n\n", dbPath)
 
-	// Connect to database
-	dbConn, err := database.New(dbPath)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+	// Initialize PocketBase
+	app := pocketbase.NewWithConfig(pocketbase.Config{
+		DefaultDataDir: dbPath,
+	})
+
+	// Bootstrap PocketBase (loads collections schema)
+	if err := app.Bootstrap(); err != nil {
+		log.Fatalf("Failed to bootstrap PocketBase: %v", err)
 	}
-	defer dbConn.Close()
-
-	// Create queries instance
-	queries := db.New(dbConn)
 
 	// Import all CSV files
-	if err := importer.ImportAll(queries, csvDir); err != nil {
+	if err := importer.ImportAll(app, csvDir); err != nil {
 		log.Fatalf("Import failed: %v", err)
 	}
 }
