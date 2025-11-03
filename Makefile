@@ -1,8 +1,7 @@
-.PHONY: generate migrate-up migrate-down run build clean install-tools css css-watch
+.PHONY: generate run build clean install-tools css css-watch
 
-# Generate sqlc and templ code
+# Generate templ code
 generate:
-	sqlc generate
 	templ generate
 
 # Build CSS with Tailwind
@@ -12,16 +11,6 @@ css:
 # Watch CSS for changes
 css-watch:
 	npm run watch:css
-
-# Database migrations
-migrate-up:
-	goose -dir migrations sqlite3 ./data.db up
-
-migrate-down:
-	goose -dir migrations sqlite3 ./data.db down
-
-migrate-status:
-	goose -dir migrations sqlite3 ./data.db status
 
 # Run the application
 run:
@@ -56,7 +45,7 @@ build-all: build-linux-amd64 build-linux-arm64 build-windows-amd64 build-windows
 # Clean generated files and binaries
 clean:
 	rm -rf bin/
-	rm -rf internal/db/
+	rm -rf pb_data/
 	rm -f *_templ.go
 	rm -f internal/templates/*_templ.go
 	rm -f static/output.css
@@ -73,14 +62,12 @@ help:
 	@echo "  build-darwin-arm64 - Build for macOS ARM64 (Apple Silicon)"
 	@echo "  build-all          - Build for all platforms"
 	@echo "  run                - Run the development server"
-	@echo "  generate           - Generate sqlc and templ code"
+	@echo "  generate           - Generate templ code"
 	@echo "  css                - Build CSS with Tailwind"
-	@echo "  migrate-up         - Run database migrations"
+	@echo "  css-watch          - Watch and rebuild CSS"
 	@echo "  clean              - Clean generated files and binaries"
 
 # Install development tools
 install-tools:
-	go install github.com/pressly/goose/v3/cmd/goose@latest
-	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	go install github.com/a-h/templ/cmd/templ@latest
 	npm install

@@ -4,9 +4,8 @@ A web application for tracking job applications, interviews, and contacts during
 
 ## Tech Stack
 
-- **Backend**: Go with standard library HTTP server
-- **Database**: SQLite with [goose](https://github.com/pressly/goose) migrations
-- **Type-safe SQL**: [sqlc](https://sqlc.dev/) for generating Go code from SQL queries
+- **Backend**: Go with [PocketBase v0.31.0](https://pocketbase.io/) (as Go package)
+- **Database**: PocketBase (SQLite with built-in migrations and type-safe API)
 - **Frontend**: [HTMX](https://htmx.org/) for dynamic interactions
 - **Templates**: [templ](https://templ.guide/) for type-safe HTML templates
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
@@ -36,16 +35,13 @@ go mod download
 make install-tools
 ```
 
-4. Run database migrations:
-```bash
-make migrate-up
-```
-
-5. (Optional) Import sample CSV data:
-```bash
-go run cmd/import/main.go
-```
-Note: The importer looks for CSV files in the `./import` directory.
+4. (Optional) Import CSV data:
+   - Place CSV files in the `./import` directory
+   - Run the import CLI:
+   ```bash
+   go run cmd/import/main.go
+   ```
+   Note: PocketBase migrations run automatically on first use. You can also import via the web interface after starting the server.
 
 ### Development
 
@@ -65,14 +61,13 @@ The application will be available at `http://localhost:5627`
 │   └── export/          # CSV export CLI utility
 ├── internal/
 │   ├── handlers/        # HTTP request handlers
-│   ├── db/              # sqlc generated database code
-│   ├── database/        # Database connection setup
+│   ├── models/          # Domain models
 │   ├── importer/        # CSV import logic (shared)
 │   ├── exporter/        # CSV export logic (shared)
 │   ├── util/            # Shared utilities (date formatting, etc.)
 │   └── templates/       # templ template files
-├── migrations/          # goose SQL migration files
-├── queries/             # SQL queries for sqlc
+├── pb_migrations/       # PocketBase schema migrations
+├── pb_data/             # PocketBase data directory (gitignored)
 ├── static/              # CSS, JS, and static assets
 ├── import/              # CSV files for import (gitignored)
 ├── export/              # Exported CSV files (gitignored)
@@ -126,32 +121,23 @@ See [CLAUDE.md](./CLAUDE.md) for detailed schema information.
 ### Database
 
 ```bash
-# Run migrations
-make migrate-up
-
-# Rollback last migration
-make migrate-down
-
-# Check migration status
-make migrate-status
-
 # Import CSV data from ./import directory
 go run cmd/import/main.go
 
 # Export all data to ./export directory
 go run cmd/export/main.go
+
+# Access PocketBase admin UI
+# Navigate to http://localhost:5627/_/
 ```
 
 ### Code Generation
 
 ```bash
-# Generate all code (sqlc + templ)
+# Generate templ templates
 make generate
 
-# Generate only sqlc code
-sqlc generate
-
-# Generate only templ templates
+# Or manually
 templ generate
 ```
 
@@ -376,27 +362,20 @@ You can also export via the web interface by clicking the **Export** button, whi
 ### Import/Export Tips
 
 - **Import Order**: The importer automatically handles the correct order (Companies → Roles → Contacts → Interviews → InterviewsContacts)
-- **IDs**: Company and role IDs in your CSV are matched during import
+- **IDs**: Old IDs in CSV are mapped to new PocketBase IDs during import
 - **NULL Values**: Use the string "NULL" (all caps) for missing/empty values in CSV files. Both import and export use this convention for consistency.
-- **Dates**: Both import and export accept/preserve multiple formats:
-  - ISO format: YYYY-MM-DD (e.g., "2025-01-15")
-  - Text format: "Month Day, Year" (e.g., "January 15, 2025" or "April 14, 2025")
-  - Data is stored as-is in the database
-  - UI displays dates in text format regardless of storage format
-- **Times**: Both import and export accept/preserve multiple formats:
-  - 24-hour format: HH:MM (e.g., "14:30")
-  - 12-hour format: HH:MM AM/PM (e.g., "2:30 PM")
-  - Data is stored as-is in the database
-- **Re-importing**: The importer appends data - delete `./data.db` first if you want to start fresh
+- **Dates**: CSV files must use ISO format (YYYY-MM-DD). The importer will convert text format dates like "April 14, 2025" to ISO format.
+- **Times**: Use 24-hour format: HH:MM (e.g., "14:30")
+- **Re-importing**: The importer appends data - delete `./pb_data/` directory first if you want to start fresh
 - **Round-trip Compatibility**: Files exported via the CLI can be directly re-imported without modification
 
 ## Development Workflow
 
-1. **Make schema changes**: Edit migration files in `migrations/`
-2. **Update queries**: Modify SQL files in `queries/`
-3. **Regenerate code**: Run `make generate`
-4. **Create templates**: Add `.templ` files in `internal/templates/`
-5. **Build handlers**: Implement HTTP handlers in `internal/handlers/`
+1. **Make schema changes**: Edit migration files in `pb_migrations/`
+2. **Create templates**: Add `.templ` files in `internal/templates/`
+3. **Regenerate templates**: Run `make generate`
+4. **Build handlers**: Implement HTTP handlers in `internal/handlers/`
+5. **Rebuild CSS**: Run `npm run build:css` after template changes
 6. **Test**: Run `go test ./...`
 
 ## CRUD Operations
