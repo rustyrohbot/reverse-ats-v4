@@ -1,23 +1,23 @@
 package templates
 
 import (
-	"reverse-ats/internal/models"
+	"reverse-ats/internal/db"
 	"fmt"
 )
 
-templ RoleFormNew(companies []models.Company) {
+templ RoleFormNew(companies []db.Company) {
 	@Layout("New Role") {
 		@roleFormFields(nil, companies, false)
 	}
 }
 
-templ RoleFormEdit(role models.Role, companies []models.Company) {
+templ RoleFormEdit(role db.Role, companies []db.Company) {
 	@Layout("Edit Role") {
 		@roleFormFields(&role, companies, true)
 	}
 }
 
-templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool) {
+templ roleFormFields(role *db.Role, companies []db.Company, isEdit bool) {
 	<div class="max-w-4xl mx-auto">
 		<div class="mb-6">
 			<h1 class="text-2xl font-semibold text-gray-900">
@@ -30,7 +30,7 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 		</div>
 		<form
 			if isEdit {
-				hx-put={ fmt.Sprintf("/roles/%s", role.ID) }
+				hx-put={ fmt.Sprintf("/roles/%d", role.RoleID) }
 			} else {
 				hx-post="/roles"
 			}
@@ -49,8 +49,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						<option value="">Select a company</option>
 						for _, company := range companies {
 							<option
-								value={ company.ID }
-								if role != nil && role.CompanyID == company.ID {
+								value={ fmt.Sprintf("%d", company.CompanyID) }
+								if role != nil && role.CompanyID == company.CompanyID {
 									selected
 								}
 							>
@@ -79,8 +79,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 					type="url"
 					id="url"
 					name="url"
-					if role != nil && role.Url != "" {
-						value={ role.Url }
+					if role != nil && role.Url.Valid {
+						value={ role.Url.String }
 					}
 					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 				/>
@@ -93,8 +93,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 					rows="4"
 					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 				>
-					if role != nil && role.Description != "" {
-						{ role.Description }
+					if role != nil && role.Description.Valid {
+						{ role.Description.String }
 					}
 				</textarea>
 			</div>
@@ -106,8 +106,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 					rows="6"
 					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 				>
-					if role != nil && role.CoverLetter != "" {
-						{ role.CoverLetter }
+					if role != nil && role.CoverLetter.Valid {
+						{ role.CoverLetter.String }
 					}
 				</textarea>
 			</div>
@@ -118,8 +118,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						type="text"
 						id="application_location"
 						name="application_location"
-						if role != nil && role.ApplicationLocation != "" {
-							value={ role.ApplicationLocation }
+						if role != nil && role.ApplicationLocation.Valid {
+							value={ role.ApplicationLocation.String }
 						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
@@ -130,8 +130,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						type="date"
 						id="applied_date"
 						name="applied_date"
-						if role != nil && role.AppliedDate != "" {
-							value={ role.AppliedDate }
+						if role != nil && role.AppliedDate.Valid {
+							value={ role.AppliedDate.String }
 						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
@@ -142,8 +142,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						type="date"
 						id="closed_date"
 						name="closed_date"
-						if role != nil && role.ClosedDate != "" {
-							value={ role.ClosedDate }
+						if role != nil && role.ClosedDate.Valid {
+							value={ role.ClosedDate.String }
 						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
@@ -156,8 +156,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						type="number"
 						id="posted_range_min"
 						name="posted_range_min"
-						if role != nil && role.PostedRangeMin != 0 {
-							value={ fmt.Sprintf("%d", role.PostedRangeMin) }
+						if role != nil && role.PostedRangeMin.Valid {
+							value={ fmt.Sprintf("%d", role.PostedRangeMin.Int64) }
 						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
@@ -168,8 +168,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						type="number"
 						id="posted_range_max"
 						name="posted_range_max"
-						if role != nil && role.PostedRangeMax != 0 {
-							value={ fmt.Sprintf("%d", role.PostedRangeMax) }
+						if role != nil && role.PostedRangeMax.Valid {
+							value={ fmt.Sprintf("%d", role.PostedRangeMax.Int64) }
 						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
@@ -180,7 +180,7 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						id="equity"
 						name="equity"
 						value="true"
-						if role != nil && role.Equity {
+						if role != nil && role.Equity.Valid && role.Equity.Bool {
 							checked
 						}
 						class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
@@ -195,8 +195,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						type="text"
 						id="work_city"
 						name="work_city"
-						if role != nil && role.WorkCity != "" {
-							value={ role.WorkCity }
+						if role != nil && role.WorkCity.Valid {
+							value={ role.WorkCity.String }
 						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
@@ -207,8 +207,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						type="text"
 						id="work_state"
 						name="work_state"
-						if role != nil && role.WorkState != "" {
-							value={ role.WorkState }
+						if role != nil && role.WorkState.Valid {
+							value={ role.WorkState.String }
 						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
@@ -221,9 +221,9 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					>
 						<option value="">Select...</option>
-						<option value="REMOTE" if role != nil && role.Location == "REMOTE" { selected }>Remote</option>
-						<option value="HYBRID" if role != nil && role.Location == "HYBRID" { selected }>Hybrid</option>
-						<option value="ONSITE" if role != nil && role.Location == "ONSITE" { selected }>Onsite</option>
+						<option value="REMOTE" if role != nil && role.Location.Valid && role.Location.String == "REMOTE" { selected }>Remote</option>
+						<option value="HYBRID" if role != nil && role.Location.Valid && role.Location.String == "HYBRID" { selected }>Hybrid</option>
+						<option value="ONSITE" if role != nil && role.Location.Valid && role.Location.String == "ONSITE" { selected }>Onsite</option>
 					</select>
 				</div>
 			</div>
@@ -236,14 +236,14 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					>
 						<option value="">Select...</option>
-						<option value="APPLIED" if role != nil && role.Status == "APPLIED" { selected }>Applied</option>
-						<option value="REJECTED" if role != nil && role.Status == "REJECTED" { selected }>Rejected</option>
-						<option value="INTERVIEWING" if role != nil && role.Status == "INTERVIEWING" { selected }>Interviewing</option>
-						<option value="WITHDREW" if role != nil && role.Status == "WITHDREW" { selected }>Withdrew</option>
-						<option value="GHOSTED" if role != nil && role.Status == "GHOSTED" { selected }>Ghosted</option>
-						<option value="FREEZE" if role != nil && role.Status == "FREEZE" { selected }>Freeze</option>
-						<option value="OFFER" if role != nil && role.Status == "OFFER" { selected }>Offer</option>
-						<option value="RESEARCH" if role != nil && role.Status == "RESEARCH" { selected }>Research</option>
+						<option value="APPLIED" if role != nil && role.Status.Valid && role.Status.String == "APPLIED" { selected }>Applied</option>
+						<option value="REJECTED" if role != nil && role.Status.Valid && role.Status.String == "REJECTED" { selected }>Rejected</option>
+						<option value="INTERVIEWING" if role != nil && role.Status.Valid && role.Status.String == "INTERVIEWING" { selected }>Interviewing</option>
+						<option value="WITHDREW" if role != nil && role.Status.Valid && role.Status.String == "WITHDREW" { selected }>Withdrew</option>
+						<option value="GHOSTED" if role != nil && role.Status.Valid && role.Status.String == "GHOSTED" { selected }>Ghosted</option>
+						<option value="FREEZE" if role != nil && role.Status.Valid && role.Status.String == "FREEZE" { selected }>Freeze</option>
+						<option value="OFFER" if role != nil && role.Status.Valid && role.Status.String == "OFFER" { selected }>Offer</option>
+						<option value="RESEARCH" if role != nil && role.Status.Valid && role.Status.String == "RESEARCH" { selected }>Research</option>
 					</select>
 				</div>
 				<div>
@@ -252,8 +252,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						type="text"
 						id="discovery"
 						name="discovery"
-						if role != nil && role.Discovery != "" {
-							value={ role.Discovery }
+						if role != nil && role.Discovery.Valid {
+							value={ role.Discovery.String }
 						}
 						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 					/>
@@ -264,7 +264,7 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 						id="referral"
 						name="referral"
 						value="true"
-						if role != nil && role.Referral {
+						if role != nil && role.Referral.Valid && role.Referral.Bool {
 							checked
 						}
 						class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
@@ -280,8 +280,8 @@ templ roleFormFields(role *models.Role, companies []models.Company, isEdit bool)
 					rows="3"
 					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
 				>
-					if role != nil && role.Notes != "" {
-						{ role.Notes }
+					if role != nil && role.Notes.Valid {
+						{ role.Notes.String }
 					}
 				</textarea>
 			</div>
