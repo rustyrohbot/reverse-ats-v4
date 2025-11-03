@@ -1,216 +1,242 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
+
+	"reverse-ats/internal/models"
 	"reverse-ats/internal/templates"
 )
 
 type ContactsHandler struct {
-	queries *db.Queries
-	dbConn  *sql.DB
+	app *pocketbase.PocketBase
 }
 
-func NewContactsHandler(queries *db.Queries, dbConn *sql.DB) *ContactsHandler {
-	return &ContactsHandler{queries: queries, dbConn: dbConn}
+func NewContactsHandler(app *pocketbase.PocketBase) *ContactsHandler {
+	return &ContactsHandler{app: app}
 }
 
-func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) {
+func recordToContact(record *core.Record) models.Contact {
+	contact := models.Contact{
+		ID:        record.Id,
+		CompanyID: record.GetString("company"),
+		FirstName: record.GetString("first_name"),
+		LastName:  record.GetString("last_name"),
+		Role:      record.GetString("role"),
+		Email:     record.GetString("email"),
+		Phone:     record.GetString("phone"),
+		Linkedin:  record.GetString("linkedin"),
+		Notes:     record.GetString("notes"),
+		CreatedAt: record.GetDateTime("created").String(),
+		UpdatedAt: record.GetDateTime("updated").String(),
+	}
+
+	// Get company name from expanded relation
+	if companyRecord := record.ExpandedOne("company"); companyRecord != nil {
+		contact.CompanyName = companyRecord.GetString("name")
+	}
+
+	return contact
+}
+
+func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) error {
 	sortBy := r.URL.Query().Get("sort")
 	order := r.URL.Query().Get("order")
 
-	// Map display names to actual column/field names
-	sortColumnMap := map[string]string{
-		"company_name": "c.name",
-		"first_name":   "ct.first_name",
-		"last_name":    "ct.last_name",
+	// Validate sort field
+	validSortFields := map[string]bool{
+		"company_name": true,
+		"first_name":   true,
+		"last_name":    true,
 	}
 
-	sortCol, ok := sortColumnMap[sortBy]
-	if !ok {
-		sortBy = "company_name"
-		sortCol = "c.name"
+	if sortBy == "" || !validSortFields[sortBy] {
+		sortBy = "first_name"
 	}
 
 	if order != "asc" && order != "desc" {
 		order = "asc"
 	}
 
-	query := fmt.Sprintf(`
-		SELECT
-			ct.contact_id,
-			ct.company_id,
-			ct.first_name,
-			ct.last_name,
-			ct.role,
-			ct.email,
-			ct.phone,
-			ct.linkedin,
-			ct.notes,
-			ct.created_at,
-			ct.updated_at,
-			c.name as company_name
-		FROM contacts ct
-		INNER JOIN companies c ON ct.company_id = c.company_id
-		ORDER BY %s %s, ct.last_name ASC, ct.first_name ASC`, sortCol, strings.ToUpper(order))
+	// Build sort string
+	sortField := sortBy
+	if order == "desc" {
+		sortField = "-" + sortBy
+	}
 
-	rows, err := h.dbConn.QueryContext(r.Context(), query)
+	// Fetch contacts
+	records, err := h.app.FindRecordsByFilter(
+		"contacts",
+		"",
+		sortField,
+		-1, // all records
+		0,
+	)
 	if err != nil {
 		http.Error(w, "Failed to fetch contacts", http.StatusInternalServerError)
-		return
+		return err
 	}
-	defer rows.Close()
 
-	var contacts []db.ListContactsWithCompanyRow
-	for rows.Next() {
-		var contact db.ListContactsWithCompanyRow
-		err := rows.Scan(
-			&contact.ContactID,
-			&contact.CompanyID,
-			&contact.FirstName,
-			&contact.LastName,
-			&contact.Role,
-			&contact.Email,
-			&contact.Phone,
-			&contact.Linkedin,
-			&contact.Notes,
-			&contact.CreatedAt,
-			&contact.UpdatedAt,
-			&contact.CompanyName,
-		)
-		if err != nil {
-			http.Error(w, "Failed to scan contacts", http.StatusInternalServerError)
-			return
+	// Convert records to Contact structs and fetch company names
+	contacts := make([]models.Contact, len(records))
+	for i, record := range records {
+		contact := recordToContact(record)
+		// Manually fetch company name
+		if companyID := record.GetString("company"); companyID != "" {
+			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+				contact.CompanyName = companyRecord.GetString("name")
+			}
 		}
-		contacts = append(contacts, contact)
+		contacts[i] = contact
 	}
 
-	templates.ContactsList(contacts, sortBy, order).Render(r.Context(), w)
+	return templates.ContactsList(contacts, sortBy, order).Render(r.Context(), w)
 }
 
-func (h *ContactsHandler) New(w http.ResponseWriter, r *http.Request) {
-	companies, err := h.queries.ListCompanies(r.Context())
+func (h *ContactsHandler) New(w http.ResponseWriter, r *http.Request) error {
+	// Fetch companies for dropdown
+	records, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	templates.ContactFormNew(companies).Render(r.Context(), w)
+	companies := make([]models.Company, len(records))
+	for i, record := range records {
+		companies[i] = recordToCompany(record)
+	}
+
+	return templates.ContactFormNew(companies).Render(r.Context(), w)
 }
 
-func (h *ContactsHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *ContactsHandler) Create(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
+		return err
 	}
 
-	companyID, err := strconv.ParseInt(r.FormValue("company_id"), 10, 64)
+	collection, err := h.app.FindCollectionByNameOrId("contacts")
 	if err != nil {
-		http.Error(w, "Invalid company ID", http.StatusBadRequest)
-		return
+		http.Error(w, "Failed to find collection", http.StatusInternalServerError)
+		return err
 	}
 
-	_, err = h.queries.CreateContact(r.Context(), db.CreateContactParams{
-		CompanyID: companyID,
-		FirstName: r.FormValue("first_name"),
-		LastName:  r.FormValue("last_name"),
-		Role:      nullString(r.FormValue("role")),
-		Email:     nullString(r.FormValue("email")),
-		Phone:     nullString(r.FormValue("phone")),
-		Linkedin:  nullString(r.FormValue("linkedin")),
-		Notes:     nullString(r.FormValue("notes")),
-	})
-	if err != nil {
+	record := core.NewRecord(collection)
+	record.Set("company", r.FormValue("company_id"))
+	record.Set("first_name", r.FormValue("first_name"))
+	record.Set("last_name", r.FormValue("last_name"))
+	record.Set("role", r.FormValue("role"))
+	record.Set("email", r.FormValue("email"))
+	record.Set("phone", r.FormValue("phone"))
+	record.Set("linkedin", r.FormValue("linkedin"))
+	record.Set("notes", r.FormValue("notes"))
+
+	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to create contact", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+	return nil
 }
 
-func (h *ContactsHandler) Edit(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/contacts/")
-	idStr = strings.TrimSuffix(idStr, "/edit")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *ContactsHandler) Edit(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
-	contact, err := h.queries.GetContact(r.Context(), id)
+	record, err := h.app.FindRecordById("contacts", id)
 	if err != nil {
 		http.Error(w, "Contact not found", http.StatusNotFound)
-		return
+		return err
 	}
 
-	companies, err := h.queries.ListCompanies(r.Context())
+	contact := recordToContact(record)
+
+	// Fetch company name for display
+	if companyID := record.GetString("company"); companyID != "" {
+		if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+			contact.CompanyName = companyRecord.GetString("name")
+		}
+	}
+
+	// Fetch companies for dropdown
+	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	templates.ContactFormEdit(contact, companies).Render(r.Context(), w)
+	companies := make([]models.Company, len(companyRecords))
+	for i, rec := range companyRecords {
+		companies[i] = recordToCompany(rec)
+	}
+
+	return templates.ContactFormEdit(contact, companies).Render(r.Context(), w)
 }
 
-func (h *ContactsHandler) Update(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/contacts/")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *ContactsHandler) Update(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
+		return err
 	}
 
-	companyID, err := strconv.ParseInt(r.FormValue("company_id"), 10, 64)
+	record, err := h.app.FindRecordById("contacts", id)
 	if err != nil {
-		http.Error(w, "Invalid company ID", http.StatusBadRequest)
-		return
+		http.Error(w, "Contact not found", http.StatusNotFound)
+		return err
 	}
 
-	err = h.queries.UpdateContact(r.Context(), db.UpdateContactParams{
-		CompanyID: companyID,
-		FirstName: r.FormValue("first_name"),
-		LastName:  r.FormValue("last_name"),
-		Role:      nullString(r.FormValue("role")),
-		Email:     nullString(r.FormValue("email")),
-		Phone:     nullString(r.FormValue("phone")),
-		Linkedin:  nullString(r.FormValue("linkedin")),
-		Notes:     nullString(r.FormValue("notes")),
-		ContactID: id,
-	})
-	if err != nil {
+	record.Set("company", r.FormValue("company_id"))
+	record.Set("first_name", r.FormValue("first_name"))
+	record.Set("last_name", r.FormValue("last_name"))
+	record.Set("role", r.FormValue("role"))
+	record.Set("email", r.FormValue("email"))
+	record.Set("phone", r.FormValue("phone"))
+	record.Set("linkedin", r.FormValue("linkedin"))
+	record.Set("notes", r.FormValue("notes"))
+
+	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to update contact", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+	return nil
 }
 
-func (h *ContactsHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/contacts/")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *ContactsHandler) Delete(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
-	err = h.queries.DeleteContact(r.Context(), id)
+	record, err := h.app.FindRecordById("contacts", id)
 	if err != nil {
+		http.Error(w, "Contact not found", http.StatusNotFound)
+		return err
+	}
+
+	if err := h.app.Delete(record); err != nil {
 		http.Error(w, "Failed to delete contact", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+	return nil
 }

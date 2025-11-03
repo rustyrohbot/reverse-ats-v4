@@ -1,7 +1,7 @@
 package templates
 
 import (
-	"reverse-ats/internal/db"
+	"reverse-ats/internal/models"
 	"fmt"
 )
 
@@ -25,7 +25,7 @@ func getSortIcon(currentSort, currentOrder, column string) string {
 	return "↓"
 }
 
-templ CompaniesList(companies []db.Company, sortBy, order string) {
+templ CompaniesList(companies []models.Company, sortBy, order string) {
 	@Layout("Companies") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -78,51 +78,51 @@ templ CompaniesList(companies []db.Company, sortBy, order string) {
 									</td>
 									<td class="px-3 py-4 text-sm text-gray-500">
 										<div class="max-h-20 overflow-y-auto max-w-md">
-											if company.Description.Valid {
-												{ company.Description.String }
+											if company.Description != "" {
+												{ company.Description }
 											} else {
 												<span class="text-gray-400">—</span>
 											}
 										</div>
 									</td>
 									<td class="px-3 py-4 text-sm max-w-xs">
-										if company.Url.Valid {
-											<a href={ templ.SafeURL(company.Url.String) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
-												{ company.Url.String }
+										if company.Url != "" {
+											<a href={ templ.SafeURL(company.Url) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+												{ company.Url }
 											</a>
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
 									<td class="px-3 py-4 text-sm max-w-xs">
-										if company.Linkedin.Valid {
-											<a href={ templ.SafeURL(company.Linkedin.String) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
-												{ company.Linkedin.String }
+										if company.Linkedin != "" {
+											<a href={ templ.SafeURL(company.Linkedin) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+												{ company.Linkedin }
 											</a>
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if company.HqCity.Valid {
-											{ company.HqCity.String }
+										if company.HqCity != "" {
+											{ company.HqCity }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if company.HqState.Valid {
-											{ company.HqState.String }
+										if company.HqState != "" {
+											{ company.HqState }
 										} else {
 											<span class="text-gray-400">—</span>
 										}
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/companies/%d/edit", company.CompanyID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+										<a href={ templ.SafeURL(fmt.Sprintf("/companies/%s/edit", company.ID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
 											Edit
 										</a>
 										<button
-											hx-delete={ fmt.Sprintf("/companies/%d", company.CompanyID) }
+											hx-delete={ fmt.Sprintf("/companies/%s", company.ID) }
 											hx-confirm="Are you sure you want to delete this company?"
 											hx-target="body"
 											class="text-red-600 hover:text-red-900"
