@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,7 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+
 	"reverse-ats/internal/importer"
 )
 
@@ -19,12 +19,11 @@ const (
 )
 
 type ImportHandler struct {
-	queries *db.Queries
-	dbConn  *sql.DB
+	app *pocketbase.PocketBase
 }
 
-func NewImportHandler(queries *db.Queries, dbConn *sql.DB) *ImportHandler {
-	return &ImportHandler{queries: queries, dbConn: dbConn}
+func NewImportHandler(app *pocketbase.PocketBase) *ImportHandler {
+	return &ImportHandler{app: app}
 }
 
 // validateCSVFile performs security checks on uploaded files
@@ -82,14 +81,14 @@ func saveUploadedFile(file io.Reader, filename string, size int64) (string, erro
 	return tempFile.Name(), nil
 }
 
-func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
+func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) error {
 	// Limit request size
 	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize*5) // Allow up to 5 files
 
 	// Parse multipart form
 	if err := r.ParseMultipartForm(maxMemory); err != nil {
 		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
-		return
+		return err
 	}
 
 	// Track temporary files for cleanup
@@ -122,7 +121,7 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			http.Error(w, fmt.Sprintf("Failed to read %s file: %v", fieldName, err), http.StatusBadRequest)
-			return
+			return err
 		}
 		defer file.Close()
 
@@ -130,7 +129,7 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		tempPath, err := saveUploadedFile(file, header.Filename, header.Size)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to save %s file: %v", fieldName, err), http.StatusBadRequest)
-			return
+			return err
 		}
 
 		tempFiles = append(tempFiles, tempPath)
@@ -140,7 +139,7 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 	// Check if at least one file was uploaded
 	if len(uploadedSteps) == 0 {
 		http.Error(w, "No files uploaded", http.StatusBadRequest)
-		return
+		return fmt.Errorf("no files uploaded")
 	}
 
 	// Set filepaths for uploaded steps
@@ -151,7 +150,7 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Import using shared logic (skip missing files)
-	errors := importer.ImportFromSteps(h.queries, steps, true)
+	errors := importer.ImportFromSteps(h.app, steps, true)
 
 	// Return response
 	if len(errors) > 0 {
@@ -159,11 +158,13 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		for _, err := range errors {
 			errorMessages = append(errorMessages, err.Error())
 		}
-		http.Error(w, "Import completed with errors:\n"+strings.Join(errorMessages, "\n"), http.StatusInternalServerError)
-		return
+		errMsg := "Import completed with errors:\n" + strings.Join(errorMessages, "\n")
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Redirect to home page on success
 	w.Header().Set("HX-Redirect", "/")
 	w.WriteHeader(http.StatusOK)
+	return nil
 }

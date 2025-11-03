@@ -1,212 +1,275 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
+
+	"reverse-ats/internal/models"
 	"reverse-ats/internal/templates"
 )
 
 type InterviewsHandler struct {
-	queries *db.Queries
-	dbConn  *sql.DB
+	app *pocketbase.PocketBase
 }
 
-func NewInterviewsHandler(queries *db.Queries, dbConn *sql.DB) *InterviewsHandler {
-	return &InterviewsHandler{queries: queries, dbConn: dbConn}
+func NewInterviewsHandler(app *pocketbase.PocketBase) *InterviewsHandler {
+	return &InterviewsHandler{app: app}
 }
 
-func (h *InterviewsHandler) List(w http.ResponseWriter, r *http.Request) {
+func recordToInterview(record *core.Record) models.Interview {
+	interview := models.Interview{
+		ID:        record.Id,
+		RoleID:    record.GetString("role"),
+		Date:      record.GetString("date"),
+		Start:     record.GetString("start"),
+		End:       record.GetString("end"),
+		Notes:     record.GetString("notes"),
+		Type:      record.GetString("type"),
+		CreatedAt: record.GetDateTime("created").String(),
+		UpdatedAt: record.GetDateTime("updated").String(),
+	}
+
+	// Get role and company info from expanded relation
+	if roleRecord := record.ExpandedOne("role"); roleRecord != nil {
+		interview.RoleName = roleRecord.GetString("name")
+		// Get company from role's company relation
+		companyID := roleRecord.GetString("company")
+		interview.CompanyID = companyID
+	}
+
+	return interview
+}
+
+func (h *InterviewsHandler) List(w http.ResponseWriter, r *http.Request) error {
 	sortBy := r.URL.Query().Get("sort")
 	order := r.URL.Query().Get("order")
 
-	// Map display names to actual column/field names
-	sortColumnMap := map[string]string{
-		"company_name": "c.name",
-		"date":         "i.date",
+	// Validate sort field
+	validSortFields := map[string]bool{
+		"company_name": true,
+		"date":         true,
 	}
 
-	sortCol, ok := sortColumnMap[sortBy]
-	if !ok {
+	if sortBy == "" || !validSortFields[sortBy] {
 		sortBy = "date"
-		sortCol = "i.date"
 	}
 
 	if order != "asc" && order != "desc" {
 		order = "desc"
 	}
 
-	query := fmt.Sprintf(`
-		SELECT
-			i.interview_id,
-			i.role_id,
-			i.date,
-			i.start,
-			i.end,
-			i.notes,
-			i.type,
-			i.created_at,
-			i.updated_at,
-			r.name as role_name,
-			c.company_id,
-			c.name as company_name
-		FROM interviews i
-		INNER JOIN roles r ON i.role_id = r.role_id
-		INNER JOIN companies c ON r.company_id = c.company_id
-		ORDER BY %s %s, i.start %s`, sortCol, strings.ToUpper(order), strings.ToUpper(order))
+	// Build sort string
+	sortField := sortBy
+	if order == "desc" {
+		sortField = "-" + sortBy
+	}
 
-	rows, err := h.dbConn.QueryContext(r.Context(), query)
+	// Fetch interviews
+	records, err := h.app.FindRecordsByFilter(
+		"interviews",
+		"",
+		sortField,
+		-1, // all records
+		0,
+	)
 	if err != nil {
 		http.Error(w, "Failed to fetch interviews", http.StatusInternalServerError)
-		return
+		return err
 	}
-	defer rows.Close()
 
-	var interviews []db.ListInterviewsWithRoleRow
-	for rows.Next() {
-		var interview db.ListInterviewsWithRoleRow
-		err := rows.Scan(
-			&interview.InterviewID,
-			&interview.RoleID,
-			&interview.Date,
-			&interview.Start,
-			&interview.End,
-			&interview.Notes,
-			&interview.Type,
-			&interview.CreatedAt,
-			&interview.UpdatedAt,
-			&interview.RoleName,
-			&interview.CompanyID,
-			&interview.CompanyName,
-		)
-		if err != nil {
-			http.Error(w, "Failed to scan interviews", http.StatusInternalServerError)
-			return
+	// Convert records to Interview structs and fetch role/company info
+	interviews := make([]models.Interview, len(records))
+	for i, record := range records {
+		interview := recordToInterview(record)
+
+		// Fetch role to get role name and company info
+		if roleID := record.GetString("role"); roleID != "" {
+			if roleRecord, err := h.app.FindRecordById("roles", roleID); err == nil {
+				interview.RoleName = roleRecord.GetString("name")
+				interview.CompanyID = roleRecord.GetString("company")
+
+				// Fetch company name
+				if companyID := roleRecord.GetString("company"); companyID != "" {
+					if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+						interview.CompanyName = companyRecord.GetString("name")
+					}
+				}
+			}
 		}
-		interviews = append(interviews, interview)
+		interviews[i] = interview
 	}
 
-	templates.InterviewsList(interviews, sortBy, order).Render(r.Context(), w)
+	return templates.InterviewsList(interviews, sortBy, order).Render(r.Context(), w)
 }
 
-func (h *InterviewsHandler) New(w http.ResponseWriter, r *http.Request) {
-	roles, err := h.queries.ListRolesWithCompany(r.Context())
+func (h *InterviewsHandler) New(w http.ResponseWriter, r *http.Request) error {
+	// Fetch roles with company info for dropdown
+	roleRecords, err := h.app.FindRecordsByFilter("roles", "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	templates.InterviewFormNew(roles).Render(r.Context(), w)
+	// Convert to RoleWithCompany format
+	roles := make([]models.Role, len(roleRecords))
+	for i, record := range roleRecords {
+		role := models.Role{
+			ID:   record.Id,
+			Name: record.GetString("name"),
+			CompanyID: record.GetString("company"),
+		}
+
+		// Fetch company name
+		if companyID := record.GetString("company"); companyID != "" {
+			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+				role.CompanyName = companyRecord.GetString("name")
+			}
+		}
+		roles[i] = role
+	}
+
+	return templates.InterviewFormNew(roles).Render(r.Context(), w)
 }
 
-func (h *InterviewsHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *InterviewsHandler) Create(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
+		return err
 	}
 
-	roleID, err := strconv.ParseInt(r.FormValue("role_id"), 10, 64)
+	collection, err := h.app.FindCollectionByNameOrId("interviews")
 	if err != nil {
-		http.Error(w, "Invalid role ID", http.StatusBadRequest)
-		return
+		http.Error(w, "Failed to find collection", http.StatusInternalServerError)
+		return err
 	}
 
-	_, err = h.queries.CreateInterview(r.Context(), db.CreateInterviewParams{
-		RoleID: roleID,
-		Date:   r.FormValue("date"),
-		Start:  r.FormValue("start"),
-		End:    r.FormValue("end"),
-		Notes:  nullString(r.FormValue("notes")),
-		Type:   r.FormValue("type"),
-	})
-	if err != nil {
+	record := core.NewRecord(collection)
+	record.Set("role", r.FormValue("role_id"))
+	record.Set("date", r.FormValue("date"))
+	record.Set("start", r.FormValue("start"))
+	record.Set("end", r.FormValue("end"))
+	record.Set("notes", r.FormValue("notes"))
+	record.Set("type", r.FormValue("type"))
+	// TODO: Handle contacts many-to-many relationship
+
+	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to create interview", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/interviews", http.StatusSeeOther)
+	return nil
 }
 
-func (h *InterviewsHandler) Edit(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/interviews/")
-	idStr = strings.TrimSuffix(idStr, "/edit")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *InterviewsHandler) Edit(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
-	interview, err := h.queries.GetInterview(r.Context(), id)
+	record, err := h.app.FindRecordById("interviews", id)
 	if err != nil {
 		http.Error(w, "Interview not found", http.StatusNotFound)
-		return
+		return err
 	}
 
-	roles, err := h.queries.ListRolesWithCompany(r.Context())
+	interview := recordToInterview(record)
+
+	// Fetch role info for display
+	if roleID := record.GetString("role"); roleID != "" {
+		if roleRecord, err := h.app.FindRecordById("roles", roleID); err == nil {
+			interview.RoleName = roleRecord.GetString("name")
+		}
+	}
+
+	// Fetch roles with company info for dropdown
+	roleRecords, err := h.app.FindRecordsByFilter("roles", "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	templates.InterviewFormEdit(interview, roles).Render(r.Context(), w)
+	// Convert to Role format with company names
+	roles := make([]models.Role, len(roleRecords))
+	for i, rec := range roleRecords {
+		role := models.Role{
+			ID:   rec.Id,
+			Name: rec.GetString("name"),
+			CompanyID: rec.GetString("company"),
+		}
+
+		// Fetch company name
+		if companyID := rec.GetString("company"); companyID != "" {
+			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+				role.CompanyName = companyRecord.GetString("name")
+			}
+		}
+		roles[i] = role
+	}
+
+	return templates.InterviewFormEdit(interview, roles).Render(r.Context(), w)
 }
 
-func (h *InterviewsHandler) Update(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/interviews/")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *InterviewsHandler) Update(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
+		return err
 	}
 
-	roleID, err := strconv.ParseInt(r.FormValue("role_id"), 10, 64)
+	record, err := h.app.FindRecordById("interviews", id)
 	if err != nil {
-		http.Error(w, "Invalid role ID", http.StatusBadRequest)
-		return
+		http.Error(w, "Interview not found", http.StatusNotFound)
+		return err
 	}
 
-	err = h.queries.UpdateInterview(r.Context(), db.UpdateInterviewParams{
-		RoleID:      roleID,
-		Date:        r.FormValue("date"),
-		Start:       r.FormValue("start"),
-		End:         r.FormValue("end"),
-		Notes:       nullString(r.FormValue("notes")),
-		Type:        r.FormValue("type"),
-		InterviewID: id,
-	})
-	if err != nil {
+	record.Set("role", r.FormValue("role_id"))
+	record.Set("date", r.FormValue("date"))
+	record.Set("start", r.FormValue("start"))
+	record.Set("end", r.FormValue("end"))
+	record.Set("notes", r.FormValue("notes"))
+	record.Set("type", r.FormValue("type"))
+	// TODO: Handle contacts many-to-many relationship
+
+	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to update interview", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/interviews", http.StatusSeeOther)
+	return nil
 }
 
-func (h *InterviewsHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/interviews/")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *InterviewsHandler) Delete(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
-	err = h.queries.DeleteInterview(r.Context(), id)
+	record, err := h.app.FindRecordById("interviews", id)
 	if err != nil {
+		http.Error(w, "Interview not found", http.StatusNotFound)
+		return err
+	}
+
+	if err := h.app.Delete(record); err != nil {
 		http.Error(w, "Failed to delete interview", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/interviews", http.StatusSeeOther)
+	return nil
 }

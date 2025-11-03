@@ -1,18 +1,18 @@
 package exporter
 
 import (
-	"database/sql"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // ExportAll exports all tables to CSV files in the specified directory
-func ExportAll(dbConn *sql.DB, outputDir string) error {
+func ExportAll(app *pocketbase.PocketBase, outputDir string) error {
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -22,7 +22,7 @@ func ExportAll(dbConn *sql.DB, outputDir string) error {
 	steps := []struct {
 		name     string
 		filename string
-		fn       func(*sql.DB, string) error
+		fn       func(*pocketbase.PocketBase, string) error
 	}{
 		{"companies", "reverse-ats - Companies.csv", ExportCompanies},
 		{"roles", "reverse-ats - Roles.csv", ExportRoles},
@@ -34,7 +34,7 @@ func ExportAll(dbConn *sql.DB, outputDir string) error {
 	for _, step := range steps {
 		filepath := outputDir + "/" + step.filename
 		fmt.Printf("Exporting %s to %s...\n", step.name, filepath)
-		if err := step.fn(dbConn, filepath); err != nil {
+		if err := step.fn(app, filepath); err != nil {
 			return fmt.Errorf("failed to export %s: %w", step.name, err)
 		}
 	}
@@ -44,13 +44,11 @@ func ExportAll(dbConn *sql.DB, outputDir string) error {
 }
 
 // ExportCompanies exports companies table to CSV
-func ExportCompanies(dbConn *sql.DB, filepath string) error {
-	query := "SELECT * FROM companies ORDER BY company_id"
-	rows, err := dbConn.Query(query)
+func ExportCompanies(app *pocketbase.PocketBase, filepath string) error {
+	records, err := app.FindRecordsByFilter("companies", "", "created", -1, 0)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
 	file, err := os.Create(filepath)
 	if err != nil {
@@ -58,17 +56,15 @@ func ExportCompanies(dbConn *sql.DB, filepath string) error {
 	}
 	defer file.Close()
 
-	return WriteCompaniesCSV(file, rows)
+	return WriteCompaniesCSV(file, records)
 }
 
 // ExportRoles exports roles table to CSV
-func ExportRoles(dbConn *sql.DB, filepath string) error {
-	query := "SELECT * FROM roles ORDER BY role_id"
-	rows, err := dbConn.Query(query)
+func ExportRoles(app *pocketbase.PocketBase, filepath string) error {
+	records, err := app.FindRecordsByFilter("roles", "", "created", -1, 0)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
 	file, err := os.Create(filepath)
 	if err != nil {
@@ -76,17 +72,15 @@ func ExportRoles(dbConn *sql.DB, filepath string) error {
 	}
 	defer file.Close()
 
-	return WriteRolesCSV(file, rows)
+	return WriteRolesCSV(file, records)
 }
 
 // ExportContacts exports contacts table to CSV
-func ExportContacts(dbConn *sql.DB, filepath string) error {
-	query := "SELECT * FROM contacts ORDER BY contact_id"
-	rows, err := dbConn.Query(query)
+func ExportContacts(app *pocketbase.PocketBase, filepath string) error {
+	records, err := app.FindRecordsByFilter("contacts", "", "created", -1, 0)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
 	file, err := os.Create(filepath)
 	if err != nil {
@@ -94,17 +88,15 @@ func ExportContacts(dbConn *sql.DB, filepath string) error {
 	}
 	defer file.Close()
 
-	return WriteContactsCSV(file, rows)
+	return WriteContactsCSV(file, records)
 }
 
 // ExportInterviews exports interviews table to CSV
-func ExportInterviews(dbConn *sql.DB, filepath string) error {
-	query := "SELECT * FROM interviews ORDER BY interview_id"
-	rows, err := dbConn.Query(query)
+func ExportInterviews(app *pocketbase.PocketBase, filepath string) error {
+	records, err := app.FindRecordsByFilter("interviews", "", "created", -1, 0)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
 	file, err := os.Create(filepath)
 	if err != nil {
@@ -112,17 +104,16 @@ func ExportInterviews(dbConn *sql.DB, filepath string) error {
 	}
 	defer file.Close()
 
-	return WriteInterviewsCSV(file, rows)
+	return WriteInterviewsCSV(file, records)
 }
 
-// ExportInterviewsContacts exports interviews_contacts junction table to CSV
-func ExportInterviewsContacts(dbConn *sql.DB, filepath string) error {
-	query := "SELECT interviews_contact_id, interview_id, contact_id FROM interviews_contacts ORDER BY interviews_contact_id"
-	rows, err := dbConn.Query(query)
+// ExportInterviewsContacts exports interview-contact relationships to CSV
+func ExportInterviewsContacts(app *pocketbase.PocketBase, filepath string) error {
+	// Fetch all interviews with contacts field
+	records, err := app.FindRecordsByFilter("interviews", "", "created", -1, 0)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
 	file, err := os.Create(filepath)
 	if err != nil {
@@ -130,11 +121,11 @@ func ExportInterviewsContacts(dbConn *sql.DB, filepath string) error {
 	}
 	defer file.Close()
 
-	return WriteInterviewsContactsCSV(file, rows)
+	return WriteInterviewsContactsCSV(file, records)
 }
 
 // WriteCompaniesCSV writes companies data to CSV writer
-func WriteCompaniesCSV(writer io.Writer, rows *sql.Rows) error {
+func WriteCompaniesCSV(writer io.Writer, records []*core.Record) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
@@ -142,31 +133,15 @@ func WriteCompaniesCSV(writer io.Writer, rows *sql.Rows) error {
 	csvWriter.Write([]string{"companyID", "name", "description", "url", "linkedin", "hqCity", "hqState"})
 
 	// Write data
-	for rows.Next() {
-		var company db.Company
-		err := rows.Scan(
-			&company.CompanyID,
-			&company.Name,
-			&company.Description,
-			&company.Url,
-			&company.Linkedin,
-			&company.HqCity,
-			&company.HqState,
-			&company.CreatedAt,
-			&company.UpdatedAt,
-		)
-		if err != nil {
-			return err
-		}
-
+	for _, record := range records {
 		csvWriter.Write([]string{
-			strconv.FormatInt(company.CompanyID, 10),
-			company.Name,
-			nullToString(company.Description),
-			nullToString(company.Url),
-			nullToString(company.Linkedin),
-			nullToString(company.HqCity),
-			nullToString(company.HqState),
+			record.Id,
+			record.GetString("name"),
+			emptyToNull(record.GetString("description")),
+			emptyToNull(record.GetString("url")),
+			emptyToNull(record.GetString("linkedin")),
+			emptyToNull(record.GetString("hq_city")),
+			emptyToNull(record.GetString("hq_state")),
 		})
 	}
 
@@ -174,7 +149,7 @@ func WriteCompaniesCSV(writer io.Writer, rows *sql.Rows) error {
 }
 
 // WriteRolesCSV writes roles data to CSV writer
-func WriteRolesCSV(writer io.Writer, rows *sql.Rows) error {
+func WriteRolesCSV(writer io.Writer, records []*core.Record) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
@@ -187,55 +162,27 @@ func WriteRolesCSV(writer io.Writer, rows *sql.Rows) error {
 	})
 
 	// Write data
-	for rows.Next() {
-		var role db.Role
-		err := rows.Scan(
-			&role.RoleID,
-			&role.CompanyID,
-			&role.Name,
-			&role.Url,
-			&role.Description,
-			&role.CoverLetter,
-			&role.ApplicationLocation,
-			&role.AppliedDate,
-			&role.ClosedDate,
-			&role.PostedRangeMin,
-			&role.PostedRangeMax,
-			&role.Equity,
-			&role.WorkCity,
-			&role.WorkState,
-			&role.Location,
-			&role.Status,
-			&role.Discovery,
-			&role.Referral,
-			&role.Notes,
-			&role.CreatedAt,
-			&role.UpdatedAt,
-		)
-		if err != nil {
-			return err
-		}
-
+	for _, record := range records {
 		csvWriter.Write([]string{
-			strconv.FormatInt(role.RoleID, 10),
-			strconv.FormatInt(role.CompanyID, 10),
-			role.Name,
-			nullToString(role.Url),
-			nullToString(role.Description),
-			nullToString(role.CoverLetter),
-			nullToString(role.ApplicationLocation),
-			nullToString(role.AppliedDate),
-			nullToString(role.ClosedDate),
-			nullInt64ToString(role.PostedRangeMin),
-			nullInt64ToString(role.PostedRangeMax),
-			nullBoolToString(role.Equity),
-			nullToString(role.WorkCity),
-			nullToString(role.WorkState),
-			nullToString(role.Location),
-			nullToString(role.Status),
-			nullToString(role.Discovery),
-			nullBoolToString(role.Referral),
-			nullToString(role.Notes),
+			record.Id,
+			record.GetString("company"),
+			record.GetString("name"),
+			emptyToNull(record.GetString("url")),
+			emptyToNull(record.GetString("description")),
+			emptyToNull(record.GetString("cover_letter")),
+			emptyToNull(record.GetString("application_location")),
+			emptyToNull(record.GetString("applied_date")),
+			emptyToNull(record.GetString("closed_date")),
+			int64ToString(record.GetInt("posted_range_min")),
+			int64ToString(record.GetInt("posted_range_max")),
+			boolToString(record.GetBool("equity")),
+			emptyToNull(record.GetString("work_city")),
+			emptyToNull(record.GetString("work_state")),
+			emptyToNull(record.GetString("location")),
+			emptyToNull(record.GetString("status")),
+			emptyToNull(record.GetString("discovery")),
+			boolToString(record.GetBool("referral")),
+			emptyToNull(record.GetString("notes")),
 		})
 	}
 
@@ -243,7 +190,7 @@ func WriteRolesCSV(writer io.Writer, rows *sql.Rows) error {
 }
 
 // WriteContactsCSV writes contacts data to CSV writer
-func WriteContactsCSV(writer io.Writer, rows *sql.Rows) error {
+func WriteContactsCSV(writer io.Writer, records []*core.Record) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
@@ -254,35 +201,17 @@ func WriteContactsCSV(writer io.Writer, rows *sql.Rows) error {
 	})
 
 	// Write data
-	for rows.Next() {
-		var contact db.Contact
-		err := rows.Scan(
-			&contact.ContactID,
-			&contact.CompanyID,
-			&contact.FirstName,
-			&contact.LastName,
-			&contact.Role,
-			&contact.Email,
-			&contact.Phone,
-			&contact.Linkedin,
-			&contact.Notes,
-			&contact.CreatedAt,
-			&contact.UpdatedAt,
-		)
-		if err != nil {
-			return err
-		}
-
+	for _, record := range records {
 		csvWriter.Write([]string{
-			strconv.FormatInt(contact.ContactID, 10),
-			strconv.FormatInt(contact.CompanyID, 10),
-			contact.FirstName,
-			contact.LastName,
-			nullToString(contact.Role),
-			nullToString(contact.Email),
-			nullToString(contact.Phone),
-			nullToString(contact.Linkedin),
-			nullToString(contact.Notes),
+			record.Id,
+			record.GetString("company"),
+			record.GetString("first_name"),
+			record.GetString("last_name"),
+			emptyToNull(record.GetString("role")),
+			emptyToNull(record.GetString("email")),
+			emptyToNull(record.GetString("phone")),
+			emptyToNull(record.GetString("linkedin")),
+			emptyToNull(record.GetString("notes")),
 		})
 	}
 
@@ -290,7 +219,7 @@ func WriteContactsCSV(writer io.Writer, rows *sql.Rows) error {
 }
 
 // WriteInterviewsCSV writes interviews data to CSV writer
-func WriteInterviewsCSV(writer io.Writer, rows *sql.Rows) error {
+func WriteInterviewsCSV(writer io.Writer, records []*core.Record) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
@@ -300,39 +229,23 @@ func WriteInterviewsCSV(writer io.Writer, rows *sql.Rows) error {
 	})
 
 	// Write data
-	for rows.Next() {
-		var interview db.Interview
-		err := rows.Scan(
-			&interview.InterviewID,
-			&interview.RoleID,
-			&interview.Date,
-			&interview.Start,
-			&interview.End,
-			&interview.Notes,
-			&interview.Type,
-			&interview.CreatedAt,
-			&interview.UpdatedAt,
-		)
-		if err != nil {
-			return err
-		}
-
+	for _, record := range records {
 		csvWriter.Write([]string{
-			strconv.FormatInt(interview.InterviewID, 10),
-			strconv.FormatInt(interview.RoleID, 10),
-			interview.Date,
-			interview.Start,
-			interview.End,
-			nullToString(interview.Notes),
-			interview.Type,
+			record.Id,
+			record.GetString("role"),
+			record.GetString("date"),
+			record.GetString("start"),
+			record.GetString("end"),
+			emptyToNull(record.GetString("notes")),
+			record.GetString("type"),
 		})
 	}
 
 	return csvWriter.Error()
 }
 
-// WriteInterviewsContactsCSV writes interviews_contacts data to CSV writer
-func WriteInterviewsContactsCSV(writer io.Writer, rows *sql.Rows) error {
+// WriteInterviewsContactsCSV writes interview-contact relationships to CSV writer
+func WriteInterviewsContactsCSV(writer io.Writer, records []*core.Record) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
@@ -341,45 +254,43 @@ func WriteInterviewsContactsCSV(writer io.Writer, rows *sql.Rows) error {
 		"interviewsContactId", "interviewId", "contactId",
 	})
 
-	// Write data
-	for rows.Next() {
-		var id, interviewID, contactID int64
-		err := rows.Scan(&id, &interviewID, &contactID)
-		if err != nil {
-			return err
-		}
+	// Write data - flatten many-to-many relationships
+	linkID := 1
+	for _, record := range records {
+		interviewID := record.Id
+		contacts := record.GetStringSlice("contacts")
 
-		csvWriter.Write([]string{
-			strconv.FormatInt(id, 10),
-			strconv.FormatInt(interviewID, 10),
-			strconv.FormatInt(contactID, 10),
-		})
+		for _, contactID := range contacts {
+			csvWriter.Write([]string{
+				strconv.Itoa(linkID),
+				interviewID,
+				contactID,
+			})
+			linkID++
+		}
 	}
 
 	return csvWriter.Error()
 }
 
 // Helper functions
-func nullToString(ns sql.NullString) string {
-	if ns.Valid {
-		return ns.String
+func emptyToNull(s string) string {
+	if s == "" {
+		return "NULL"
 	}
-	return "NULL"
+	return s
 }
 
-func nullInt64ToString(ni sql.NullInt64) string {
-	if ni.Valid {
-		return strconv.FormatInt(ni.Int64, 10)
+func int64ToString(val int) string {
+	if val == 0 {
+		return "NULL"
 	}
-	return "NULL"
+	return strconv.Itoa(val)
 }
 
-func nullBoolToString(nb sql.NullBool) string {
-	if nb.Valid {
-		if nb.Bool {
-			return "true"
-		}
-		return "false"
+func boolToString(val bool) string {
+	if val {
+		return "true"
 	}
-	return "NULL"
+	return "false"
 }
