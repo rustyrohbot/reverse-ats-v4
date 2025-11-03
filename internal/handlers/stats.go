@@ -5,21 +5,21 @@ import (
 	"net/http"
 	"time"
 
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+
 	"reverse-ats/internal/templates"
 	"reverse-ats/internal/util"
 )
 
 type StatsHandler struct {
-	queries *db.Queries
-	dbConn  *sql.DB
+	app *pocketbase.PocketBase
 }
 
-func NewStatsHandler(queries *db.Queries, dbConn *sql.DB) *StatsHandler {
-	return &StatsHandler{queries: queries, dbConn: dbConn}
+func NewStatsHandler(app *pocketbase.PocketBase) *StatsHandler {
+	return &StatsHandler{app: app}
 }
 
-func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
+func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) error {
 	dateRange := r.URL.Query().Get("range")
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
@@ -67,29 +67,16 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 		filterDates = true
 	}
 
-	// Build SQL date filter using SQLite's date parsing
+	// Build SQL date filter
 	var dateClause string
 	var whereClause string
 	if filterDates {
-		// Convert text dates like "April 8, 2025" to ISO format for comparison
 		startStr := startDateFilter.Format("2006-01-02")
 		endStr := endDateFilter.Format("2006-01-02")
 
-		// SQL to convert dates to ISO format for comparison
-		// Handles both "April 8, 2025" and "2025-04-08" formats
-		dateConversion := "CASE " +
-			"WHEN applied_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN applied_date " +
-			"ELSE substr(applied_date, -4) || '-' || " +
-			"CASE substr(applied_date, 1, instr(applied_date, ' ')-1) " +
-			"WHEN 'January' THEN '01' WHEN 'February' THEN '02' WHEN 'March' THEN '03' " +
-			"WHEN 'April' THEN '04' WHEN 'May' THEN '05' WHEN 'June' THEN '06' " +
-			"WHEN 'July' THEN '07' WHEN 'August' THEN '08' WHEN 'September' THEN '09' " +
-			"WHEN 'October' THEN '10' WHEN 'November' THEN '11' WHEN 'December' THEN '12' END || '-' || " +
-			"printf('%02d', CAST(replace(substr(applied_date, instr(applied_date, ' ')+1, instr(substr(applied_date, instr(applied_date, ' ')+1), ',') - 1), ' ', '') AS INTEGER)) " +
-			"END"
-
-		dateClause = " AND (" + dateConversion + ") BETWEEN '" + startStr + "' AND '" + endStr + "'"
-		whereClause = " WHERE applied_date IS NOT NULL AND (" + dateConversion + ") BETWEEN '" + startStr + "' AND '" + endStr + "'"
+		// PocketBase stores dates in ISO format, so we can compare directly
+		dateClause = " AND applied_date BETWEEN '" + startStr + "' AND '" + endStr + "'"
+		whereClause = " WHERE applied_date IS NOT NULL AND applied_date != '' AND applied_date BETWEEN '" + startStr + "' AND '" + endStr + "'"
 	}
 
 	stats := templates.StatsData{
@@ -98,46 +85,35 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 		EndDate:   endDate,
 	}
 
-	// Query: First and Last Application Dates
-	// We need to convert dates to ISO format for proper MIN/MAX comparison
-	// Handles both "April 8, 2025" and "2025-04-08" formats
-	dateConversionForMinMax := "CASE " +
-		"WHEN applied_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN applied_date " +
-		"ELSE substr(applied_date, -4) || '-' || " +
-		"CASE substr(applied_date, 1, instr(applied_date, ' ')-1) " +
-		"WHEN 'January' THEN '01' WHEN 'February' THEN '02' WHEN 'March' THEN '03' " +
-		"WHEN 'April' THEN '04' WHEN 'May' THEN '05' WHEN 'June' THEN '06' " +
-		"WHEN 'July' THEN '07' WHEN 'August' THEN '08' WHEN 'September' THEN '09' " +
-		"WHEN 'October' THEN '10' WHEN 'November' THEN '11' WHEN 'December' THEN '12' END || '-' || " +
-		"printf('%02d', CAST(replace(substr(applied_date, instr(applied_date, ' ')+1, instr(substr(applied_date, instr(applied_date, ' ')+1), ',') - 1), ' ', '') AS INTEGER)) " +
-		"END"
+	// Get database connection
+	db := h.app.DB()
 
+	// Query: First and Last Application Dates
 	var firstDateQuery, lastDateQuery string
 	if whereClause != "" {
-		// Use subquery to get the original date text for the min/max converted dates
 		firstDateQuery = "SELECT applied_date FROM roles " + whereClause +
-			" ORDER BY (" + dateConversionForMinMax + ") ASC LIMIT 1"
+			" ORDER BY applied_date ASC LIMIT 1"
 		lastDateQuery = "SELECT applied_date FROM roles " + whereClause +
-			" ORDER BY (" + dateConversionForMinMax + ") DESC LIMIT 1"
+			" ORDER BY applied_date DESC LIMIT 1"
 	} else {
-		firstDateQuery = "SELECT applied_date FROM roles WHERE applied_date IS NOT NULL " +
-			"ORDER BY (" + dateConversionForMinMax + ") ASC LIMIT 1"
-		lastDateQuery = "SELECT applied_date FROM roles WHERE applied_date IS NOT NULL " +
-			"ORDER BY (" + dateConversionForMinMax + ") DESC LIMIT 1"
+		firstDateQuery = "SELECT applied_date FROM roles WHERE applied_date IS NOT NULL AND applied_date != '' " +
+			"ORDER BY applied_date ASC LIMIT 1"
+		lastDateQuery = "SELECT applied_date FROM roles WHERE applied_date IS NOT NULL AND applied_date != '' " +
+			"ORDER BY applied_date DESC LIMIT 1"
 	}
 	var firstDate, lastDate sql.NullString
-	h.dbConn.QueryRow(firstDateQuery).Scan(&firstDate)
-	h.dbConn.QueryRow(lastDateQuery).Scan(&lastDate)
-	if firstDate.Valid {
+	db.NewQuery(firstDateQuery).Row(&firstDate)
+	db.NewQuery(lastDateQuery).Row(&lastDate)
+	if firstDate.Valid && firstDate.String != "" {
 		stats.FirstApplicationDate = util.FormatDateToText(firstDate.String)
 	}
-	if lastDate.Valid {
+	if lastDate.Valid && lastDate.String != "" {
 		stats.LastApplicationDate = util.FormatDateToText(lastDate.String)
 	}
 
 	// Query: Roles Applied (count of roles with applied_date in range)
-	rolesQuery := "SELECT COUNT(*) FROM roles WHERE applied_date IS NOT NULL" + dateClause
-	h.dbConn.QueryRow(rolesQuery).Scan(&stats.RolesApplied)
+	rolesQuery := "SELECT COUNT(*) FROM roles WHERE applied_date IS NOT NULL AND applied_date != ''" + dateClause
+	db.NewQuery(rolesQuery).Row(&stats.RolesApplied)
 
 	// Query: Offers Received
 	var offersQuery string
@@ -146,7 +122,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		offersQuery = "SELECT COUNT(*) FROM roles WHERE status = 'OFFER'"
 	}
-	h.dbConn.QueryRow(offersQuery).Scan(&stats.OffersReceived)
+	db.NewQuery(offersQuery).Row(&stats.OffersReceived)
 
 	// Query: Rejections
 	var rejectionsQuery string
@@ -155,7 +131,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		rejectionsQuery = "SELECT COUNT(*) FROM roles WHERE status = 'REJECTED'"
 	}
-	h.dbConn.QueryRow(rejectionsQuery).Scan(&stats.Rejections)
+	db.NewQuery(rejectionsQuery).Row(&stats.Rejections)
 
 	// Query: Interviewing
 	var interviewingQuery string
@@ -164,7 +140,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		interviewingQuery = "SELECT COUNT(*) FROM roles WHERE status = 'INTERVIEWING'"
 	}
-	h.dbConn.QueryRow(interviewingQuery).Scan(&stats.Interviewing)
+	db.NewQuery(interviewingQuery).Row(&stats.Interviewing)
 
 	// Query: Ghosted
 	var ghostedQuery string
@@ -173,7 +149,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ghostedQuery = "SELECT COUNT(*) FROM roles WHERE status = 'GHOSTED'"
 	}
-	h.dbConn.QueryRow(ghostedQuery).Scan(&stats.Ghosted)
+	db.NewQuery(ghostedQuery).Row(&stats.Ghosted)
 
 	// Query: Freeze
 	var freezeQuery string
@@ -182,7 +158,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		freezeQuery = "SELECT COUNT(*) FROM roles WHERE status = 'FREEZE'"
 	}
-	h.dbConn.QueryRow(freezeQuery).Scan(&stats.Freeze)
+	db.NewQuery(freezeQuery).Row(&stats.Freeze)
 
 	// Query: Withdrew
 	var withdrewQuery string
@@ -191,17 +167,17 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		withdrewQuery = "SELECT COUNT(*) FROM roles WHERE status = 'WITHDREW'"
 	}
-	h.dbConn.QueryRow(withdrewQuery).Scan(&stats.Withdrew)
+	db.NewQuery(withdrewQuery).Row(&stats.Withdrew)
 
 	// Query: Average Posted Min
 	var avgMinQuery string
 	if whereClause != "" {
-		avgMinQuery = "SELECT AVG(CAST(posted_range_min AS REAL)) FROM roles" + whereClause + " AND posted_range_min IS NOT NULL"
+		avgMinQuery = "SELECT AVG(CAST(posted_range_min AS REAL)) FROM roles" + whereClause + " AND posted_range_min IS NOT NULL AND posted_range_min != 0"
 	} else {
-		avgMinQuery = "SELECT AVG(CAST(posted_range_min AS REAL)) FROM roles WHERE posted_range_min IS NOT NULL"
+		avgMinQuery = "SELECT AVG(CAST(posted_range_min AS REAL)) FROM roles WHERE posted_range_min IS NOT NULL AND posted_range_min != 0"
 	}
 	var avgMin sql.NullFloat64
-	h.dbConn.QueryRow(avgMinQuery).Scan(&avgMin)
+	db.NewQuery(avgMinQuery).Row(&avgMin)
 	if avgMin.Valid {
 		stats.AvgPostedMin = avgMin.Float64
 	}
@@ -209,12 +185,12 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	// Query: Average Posted Max
 	var avgMaxQuery string
 	if whereClause != "" {
-		avgMaxQuery = "SELECT AVG(CAST(posted_range_max AS REAL)) FROM roles" + whereClause + " AND posted_range_max IS NOT NULL"
+		avgMaxQuery = "SELECT AVG(CAST(posted_range_max AS REAL)) FROM roles" + whereClause + " AND posted_range_max IS NOT NULL AND posted_range_max != 0"
 	} else {
-		avgMaxQuery = "SELECT AVG(CAST(posted_range_max AS REAL)) FROM roles WHERE posted_range_max IS NOT NULL"
+		avgMaxQuery = "SELECT AVG(CAST(posted_range_max AS REAL)) FROM roles WHERE posted_range_max IS NOT NULL AND posted_range_max != 0"
 	}
 	var avgMax sql.NullFloat64
-	h.dbConn.QueryRow(avgMaxQuery).Scan(&avgMax)
+	db.NewQuery(avgMaxQuery).Row(&avgMax)
 	if avgMax.Valid {
 		stats.AvgPostedMax = avgMax.Float64
 	}
@@ -222,12 +198,12 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	// Query: Absolute Posted Min
 	var absMinQuery string
 	if whereClause != "" {
-		absMinQuery = "SELECT MIN(posted_range_min) FROM roles" + whereClause + " AND posted_range_min IS NOT NULL"
+		absMinQuery = "SELECT MIN(posted_range_min) FROM roles" + whereClause + " AND posted_range_min IS NOT NULL AND posted_range_min != 0"
 	} else {
-		absMinQuery = "SELECT MIN(posted_range_min) FROM roles WHERE posted_range_min IS NOT NULL"
+		absMinQuery = "SELECT MIN(posted_range_min) FROM roles WHERE posted_range_min IS NOT NULL AND posted_range_min != 0"
 	}
 	var absMin sql.NullInt64
-	h.dbConn.QueryRow(absMinQuery).Scan(&absMin)
+	db.NewQuery(absMinQuery).Row(&absMin)
 	if absMin.Valid {
 		stats.AbsPostedMin = absMin.Int64
 	}
@@ -235,12 +211,12 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	// Query: Absolute Posted Max
 	var absMaxQuery string
 	if whereClause != "" {
-		absMaxQuery = "SELECT MAX(posted_range_max) FROM roles" + whereClause + " AND posted_range_max IS NOT NULL"
+		absMaxQuery = "SELECT MAX(posted_range_max) FROM roles" + whereClause + " AND posted_range_max IS NOT NULL AND posted_range_max != 0"
 	} else {
-		absMaxQuery = "SELECT MAX(posted_range_max) FROM roles WHERE posted_range_max IS NOT NULL"
+		absMaxQuery = "SELECT MAX(posted_range_max) FROM roles WHERE posted_range_max IS NOT NULL AND posted_range_max != 0"
 	}
 	var absMax sql.NullInt64
-	h.dbConn.QueryRow(absMaxQuery).Scan(&absMax)
+	db.NewQuery(absMaxQuery).Row(&absMax)
 	if absMax.Valid {
 		stats.AbsPostedMax = absMax.Int64
 	}
@@ -252,7 +228,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		remoteQuery = "SELECT COUNT(*) FROM roles WHERE location = 'REMOTE'"
 	}
-	h.dbConn.QueryRow(remoteQuery).Scan(&stats.RemoteRoles)
+	db.NewQuery(remoteQuery).Row(&stats.RemoteRoles)
 
 	// Query: Hybrid Roles
 	var hybridQuery string
@@ -261,7 +237,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		hybridQuery = "SELECT COUNT(*) FROM roles WHERE location = 'HYBRID'"
 	}
-	h.dbConn.QueryRow(hybridQuery).Scan(&stats.HybridRoles)
+	db.NewQuery(hybridQuery).Row(&stats.HybridRoles)
 
 	// Query: Onsite Roles
 	var onsiteQuery string
@@ -270,28 +246,14 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		onsiteQuery = "SELECT COUNT(*) FROM roles WHERE location = 'ONSITE'"
 	}
-	h.dbConn.QueryRow(onsiteQuery).Scan(&stats.OnsiteRoles)
+	db.NewQuery(onsiteQuery).Row(&stats.OnsiteRoles)
 
 	// For interviews, apply the same date filter (using 'date' column)
 	var interviewWhereClause string
 	if filterDates {
 		startStr := startDateFilter.Format("2006-01-02")
 		endStr := endDateFilter.Format("2006-01-02")
-
-		// SQL to convert interview date field to ISO format
-		// Handles both "April 8, 2025" and "2025-04-08" formats
-		interviewDateConversion := "CASE " +
-			"WHEN date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN date " +
-			"ELSE substr(date, -4) || '-' || " +
-			"CASE substr(date, 1, instr(date, ' ')-1) " +
-			"WHEN 'January' THEN '01' WHEN 'February' THEN '02' WHEN 'March' THEN '03' " +
-			"WHEN 'April' THEN '04' WHEN 'May' THEN '05' WHEN 'June' THEN '06' " +
-			"WHEN 'July' THEN '07' WHEN 'August' THEN '08' WHEN 'September' THEN '09' " +
-			"WHEN 'October' THEN '10' WHEN 'November' THEN '11' WHEN 'December' THEN '12' END || '-' || " +
-			"printf('%02d', CAST(replace(substr(date, instr(date, ' ')+1, instr(substr(date, instr(date, ' ')+1), ',') - 1), ' ', '') AS INTEGER)) " +
-			"END"
-
-		interviewWhereClause = " WHERE (" + interviewDateConversion + ") BETWEEN '" + startStr + "' AND '" + endStr + "'"
+		interviewWhereClause = " WHERE date BETWEEN '" + startStr + "' AND '" + endStr + "'"
 	}
 
 	// Query: Total Interviews
@@ -301,7 +263,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		totalInterviewsQuery = "SELECT COUNT(*) FROM interviews"
 	}
-	h.dbConn.QueryRow(totalInterviewsQuery).Scan(&stats.TotalInterviews)
+	db.NewQuery(totalInterviewsQuery).Row(&stats.TotalInterviews)
 
 	// Query: Recruiter Interviews
 	var recruiterQuery string
@@ -310,7 +272,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		recruiterQuery = "SELECT COUNT(*) FROM interviews WHERE type = 'RECRUITER'"
 	}
-	h.dbConn.QueryRow(recruiterQuery).Scan(&stats.RecruiterInterviews)
+	db.NewQuery(recruiterQuery).Row(&stats.RecruiterInterviews)
 
 	// Query: Manager Interviews
 	var managerQuery string
@@ -319,7 +281,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		managerQuery = "SELECT COUNT(*) FROM interviews WHERE type = 'MANAGER'"
 	}
-	h.dbConn.QueryRow(managerQuery).Scan(&stats.ManagerInterviews)
+	db.NewQuery(managerQuery).Row(&stats.ManagerInterviews)
 
 	// Query: Loop Interviews
 	var loopQuery string
@@ -328,7 +290,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		loopQuery = "SELECT COUNT(*) FROM interviews WHERE type = 'LOOP'"
 	}
-	h.dbConn.QueryRow(loopQuery).Scan(&stats.LoopInterviews)
+	db.NewQuery(loopQuery).Row(&stats.LoopInterviews)
 
 	// Query: Tech Screen Interviews
 	var techScreenQuery string
@@ -337,7 +299,7 @@ func (h *StatsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		techScreenQuery = "SELECT COUNT(*) FROM interviews WHERE type = 'TECH_SCREEN'"
 	}
-	h.dbConn.QueryRow(techScreenQuery).Scan(&stats.TechScreenInterviews)
+	db.NewQuery(techScreenQuery).Row(&stats.TechScreenInterviews)
 
-	templates.Stats(stats).Render(r.Context(), w)
+	return templates.Stats(stats).Render(r.Context(), w)
 }

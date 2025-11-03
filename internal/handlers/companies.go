@@ -1,26 +1,39 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 
-	"reverse-ats/internal/db"
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
+
+	"reverse-ats/internal/models"
 	"reverse-ats/internal/templates"
 )
 
 type CompaniesHandler struct {
-	queries *db.Queries
-	dbConn  *sql.DB
+	app *pocketbase.PocketBase
 }
 
-func NewCompaniesHandler(queries *db.Queries, dbConn *sql.DB) *CompaniesHandler {
-	return &CompaniesHandler{queries: queries, dbConn: dbConn}
+func NewCompaniesHandler(app *pocketbase.PocketBase) *CompaniesHandler {
+	return &CompaniesHandler{app: app}
 }
 
-func (h *CompaniesHandler) List(w http.ResponseWriter, r *http.Request) {
+func recordToCompany(record *core.Record) models.Company {
+	return models.Company{
+		ID:          record.Id,
+		Name:        record.GetString("name"),
+		Description: record.GetString("description"),
+		Url:         record.GetString("url"),
+		Linkedin:    record.GetString("linkedin"),
+		HqCity:      record.GetString("hq_city"),
+		HqState:     record.GetString("hq_state"),
+		CreatedAt:   record.GetDateTime("created").String(),
+		UpdatedAt:   record.GetDateTime("updated").String(),
+	}
+}
+
+func (h *CompaniesHandler) List(w http.ResponseWriter, r *http.Request) error {
 	sortBy := r.URL.Query().Get("sort")
 	order := r.URL.Query().Get("order")
 
@@ -39,143 +52,138 @@ func (h *CompaniesHandler) List(w http.ResponseWriter, r *http.Request) {
 		order = "asc"
 	}
 
-	query := fmt.Sprintf("SELECT * FROM companies ORDER BY %s %s", sortBy, strings.ToUpper(order))
-	rows, err := h.dbConn.QueryContext(r.Context(), query)
+	// Fetch companies from PocketBase
+	sortField := sortBy
+	if order == "desc" {
+		sortField = "-" + sortBy
+	}
+	records, err := h.app.FindRecordsByFilter(
+		"companies",
+		"",
+		sortField,
+		-1, // all records
+		0,
+	)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	var companies []db.Company
-	for rows.Next() {
-		var c db.Company
-		err := rows.Scan(
-			&c.CompanyID,
-			&c.Name,
-			&c.Description,
-			&c.Url,
-			&c.Linkedin,
-			&c.HqCity,
-			&c.HqState,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-		)
-		if err != nil {
-			http.Error(w, "Failed to scan companies", http.StatusInternalServerError)
-			return
-		}
-		companies = append(companies, c)
+		return err
 	}
 
-	templates.CompaniesList(companies, sortBy, order).Render(r.Context(), w)
+	// Convert records to Company structs
+	companies := make([]models.Company, len(records))
+	for i, record := range records {
+		companies[i] = recordToCompany(record)
+	}
+
+	return templates.CompaniesList(companies, sortBy, order).Render(r.Context(), w)
 }
 
-func (h *CompaniesHandler) New(w http.ResponseWriter, r *http.Request) {
-	templates.CompanyFormNew().Render(r.Context(), w)
+func (h *CompaniesHandler) New(w http.ResponseWriter, r *http.Request) error {
+	return templates.CompanyFormNew().Render(r.Context(), w)
 }
 
-func (h *CompaniesHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *CompaniesHandler) Create(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
+		return err
 	}
 
-	name := r.FormValue("name")
-	description := nullString(r.FormValue("description"))
-	url := nullString(r.FormValue("url"))
-	linkedin := nullString(r.FormValue("linkedin"))
-	hqCity := nullString(r.FormValue("hq_city"))
-	hqState := nullString(r.FormValue("hq_state"))
-
-	_, err := h.queries.CreateCompany(r.Context(), db.CreateCompanyParams{
-		Name:        name,
-		Description: description,
-		Url:         url,
-		Linkedin:    linkedin,
-		HqCity:      hqCity,
-		HqState:     hqState,
-	})
+	collection, err := h.app.FindCollectionByNameOrId("companies")
 	if err != nil {
+		http.Error(w, "Failed to find collection", http.StatusInternalServerError)
+		return err
+	}
+
+	record := core.NewRecord(collection)
+	record.Set("name", r.FormValue("name"))
+	record.Set("description", r.FormValue("description"))
+	record.Set("url", r.FormValue("url"))
+	record.Set("linkedin", r.FormValue("linkedin"))
+	record.Set("hq_city", r.FormValue("hq_city"))
+	record.Set("hq_state", r.FormValue("hq_state"))
+
+	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to create company", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/companies", http.StatusSeeOther)
+	return nil
 }
 
-func (h *CompaniesHandler) Edit(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/companies/")
-	idStr = strings.TrimSuffix(idStr, "/edit")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *CompaniesHandler) Edit(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
-	company, err := h.queries.GetCompany(r.Context(), id)
+	record, err := h.app.FindRecordById("companies", id)
 	if err != nil {
 		http.Error(w, "Company not found", http.StatusNotFound)
-		return
+		return err
 	}
 
-	templates.CompanyFormEdit(company).Render(r.Context(), w)
+	company := recordToCompany(record)
+	return templates.CompanyFormEdit(company).Render(r.Context(), w)
 }
 
-func (h *CompaniesHandler) Update(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/companies/")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *CompaniesHandler) Update(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
+		return err
 	}
 
-	name := r.FormValue("name")
-	description := nullString(r.FormValue("description"))
-	url := nullString(r.FormValue("url"))
-	linkedin := nullString(r.FormValue("linkedin"))
-	hqCity := nullString(r.FormValue("hq_city"))
-	hqState := nullString(r.FormValue("hq_state"))
-
-	err = h.queries.UpdateCompany(r.Context(), db.UpdateCompanyParams{
-		Name:        name,
-		Description: description,
-		Url:         url,
-		Linkedin:    linkedin,
-		HqCity:      hqCity,
-		HqState:     hqState,
-		CompanyID:   id,
-	})
+	record, err := h.app.FindRecordById("companies", id)
 	if err != nil {
+		http.Error(w, "Company not found", http.StatusNotFound)
+		return err
+	}
+
+	record.Set("name", r.FormValue("name"))
+	record.Set("description", r.FormValue("description"))
+	record.Set("url", r.FormValue("url"))
+	record.Set("linkedin", r.FormValue("linkedin"))
+	record.Set("hq_city", r.FormValue("hq_city"))
+	record.Set("hq_state", r.FormValue("hq_state"))
+
+	if err := h.app.Save(record); err != nil {
 		http.Error(w, "Failed to update company", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/companies", http.StatusSeeOther)
+	return nil
 }
 
-func (h *CompaniesHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/companies/")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+func (h *CompaniesHandler) Delete(w http.ResponseWriter, r *http.Request) error {
+	// Extract ID from URL path parameter
+	id := r.PathValue("id")
+	if id == "" {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return fmt.Errorf("missing id parameter")
 	}
 
-	err = h.queries.DeleteCompany(r.Context(), id)
+	record, err := h.app.FindRecordById("companies", id)
 	if err != nil {
+		http.Error(w, "Company not found", http.StatusNotFound)
+		return err
+	}
+
+	if err := h.app.Delete(record); err != nil {
 		http.Error(w, "Failed to delete company", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.Redirect(w, r, "/companies", http.StatusSeeOther)
+	return nil
 }
 

@@ -1,12 +1,12 @@
 package templates
 
 import (
-	"reverse-ats/internal/db"
+	"reverse-ats/internal/models"
 	"reverse-ats/internal/util"
 	"fmt"
 )
 
-templ InterviewsList(interviews []db.ListInterviewsWithRoleRow, sortBy, order string) {
+templ InterviewsList(interviews []models.Interview, sortBy, order string) {
 	@Layout("Interviews") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -70,19 +70,19 @@ templ InterviewsList(interviews []db.ListInterviewsWithRoleRow, sortBy, order st
 									</td>
 									<td class="px-3 py-4 text-sm text-gray-500">
 										<div class="max-h-20 overflow-y-auto max-w-md">
-											if interview.Notes.Valid {
-												{ interview.Notes.String }
+											if interview.Notes != "" {
+												{ interview.Notes }
 											} else {
 												<span class="text-gray-400">—</span>
 											}
 										</div>
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/interviews/%d/edit", interview.InterviewID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+										<a href={ templ.SafeURL(fmt.Sprintf("/interviews/%s/edit", interview.ID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
 											Edit
 										</a>
 										<button
-											hx-delete={ fmt.Sprintf("/interviews/%d", interview.InterviewID) }
+											hx-delete={ fmt.Sprintf("/interviews/%s", interview.ID) }
 											hx-confirm="Are you sure you want to delete this interview?"
 											hx-target="body"
 											class="text-red-600 hover:text-red-900"
