@@ -25,17 +25,75 @@ func getSortIcon(currentSort, currentOrder, column string) string {
 	return "↓"
 }
 
+templ CompanyRow(company models.Company) {
+	<tr class="hover:bg-gray-50 divide-x divide-gray-200" id={ fmt.Sprintf("company-%s", company.ID) }>
+		<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+			{ company.Name }
+		</td>
+		<td class="px-3 py-4 text-sm text-gray-500">
+			<div class="max-h-20 overflow-y-auto max-w-md">
+				if company.Description != "" {
+					{ company.Description }
+				} else {
+					<span class="text-gray-400">—</span>
+				}
+			</div>
+		</td>
+		<td class="px-3 py-4 text-sm max-w-xs">
+			if company.Url != "" {
+				<a href={ templ.SafeURL(company.Url) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+					{ company.Url }
+				</a>
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="px-3 py-4 text-sm max-w-xs">
+			if company.Linkedin != "" {
+				<a href={ templ.SafeURL(company.Linkedin) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
+					{ company.Linkedin }
+				</a>
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+			if company.HqCity != "" {
+				{ company.HqCity }
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+			if company.HqState != "" {
+				{ company.HqState }
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+			<a href={ templ.SafeURL(fmt.Sprintf("/companies/%s/edit", company.ID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
+				Edit
+			</a>
+			<button
+				hx-delete={ fmt.Sprintf("/companies/%s", company.ID) }
+				hx-confirm="Are you sure you want to delete this company?"
+				hx-target={ fmt.Sprintf("#company-%s", company.ID) }
+				hx-swap="outerHTML swap:1s"
+				class="text-red-600 hover:text-red-900"
+			>
+				Delete
+			</button>
+		</td>
+	</tr>
+}
+
 templ CompaniesList(companies []models.Company, sortBy, order string) {
 	@Layout("Companies") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
 				<h1 class="text-2xl font-semibold text-gray-900">Companies</h1>
 				<p class="mt-2 text-sm text-gray-700">{ fmt.Sprintf("%d companies tracked", len(companies)) }</p>
-			</div>
-			<div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-				<a href="/companies/new" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 inline-block">
-					Add company
-				</a>
 			</div>
 		</div>
 		<div class="mt-8 flow-root">
@@ -71,66 +129,127 @@ templ CompaniesList(companies []models.Company, sortBy, order string) {
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-gray-200 bg-white">
-							for _, company := range companies {
-								<tr class="hover:bg-gray-50 divide-x divide-gray-200">
-									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-										{ company.Name }
+							<!-- Inline add form -->
+							<tr class="bg-blue-50 divide-x divide-gray-200" id="company-form-row">
+								<form
+									hx-post="/companies"
+									hx-target="#company-form-row"
+									hx-swap="afterend"
+									hx-on::after-request="this.reset()"
+									class="contents"
+								>
+									<td class="py-4 pl-4 pr-3 text-sm sm:pl-6">
+										<input
+											type="text"
+											name="name"
+											placeholder="Company name *"
+											required
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
 									</td>
-									<td class="px-3 py-4 text-sm text-gray-500">
-										<div class="max-h-20 overflow-y-auto max-w-md">
-											if company.Description != "" {
-												{ company.Description }
-											} else {
-												<span class="text-gray-400">—</span>
-											}
-										</div>
+									<td class="px-3 py-4 text-sm">
+										<textarea
+											name="description"
+											placeholder="Description"
+											rows="2"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										></textarea>
 									</td>
-									<td class="px-3 py-4 text-sm max-w-xs">
-										if company.Url != "" {
-											<a href={ templ.SafeURL(company.Url) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
-												{ company.Url }
-											</a>
-										} else {
-											<span class="text-gray-400">—</span>
-										}
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="url"
+											name="url"
+											placeholder="https://example.com"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
 									</td>
-									<td class="px-3 py-4 text-sm max-w-xs">
-										if company.Linkedin != "" {
-											<a href={ templ.SafeURL(company.Linkedin) } target="_blank" class="text-indigo-600 hover:text-indigo-900 truncate block">
-												{ company.Linkedin }
-											</a>
-										} else {
-											<span class="text-gray-400">—</span>
-										}
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="url"
+											name="linkedin"
+											placeholder="LinkedIn URL"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
 									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if company.HqCity != "" {
-											{ company.HqCity }
-										} else {
-											<span class="text-gray-400">—</span>
-										}
+									<td class="px-3 py-4 text-sm">
+										<input
+											type="text"
+											name="hq_city"
+											placeholder="City"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										/>
 									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										if company.HqState != "" {
-											{ company.HqState }
-										} else {
-											<span class="text-gray-400">—</span>
-										}
-									</td>
-									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/companies/%s/edit", company.ID)) } class="text-indigo-600 hover:text-indigo-900 mr-4">
-											Edit
-										</a>
-										<button
-											hx-delete={ fmt.Sprintf("/companies/%s", company.ID) }
-											hx-confirm="Are you sure you want to delete this company?"
-											hx-target="body"
-											class="text-red-600 hover:text-red-900"
+									<td class="px-3 py-4 text-sm">
+										<select
+											name="hq_state"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
 										>
-											Delete
+											<option value="">Select State</option>
+											<option value="AL">AL</option>
+											<option value="AK">AK</option>
+											<option value="AZ">AZ</option>
+											<option value="AR">AR</option>
+											<option value="CA">CA</option>
+											<option value="CO">CO</option>
+											<option value="CT">CT</option>
+											<option value="DE">DE</option>
+											<option value="FL">FL</option>
+											<option value="GA">GA</option>
+											<option value="HI">HI</option>
+											<option value="ID">ID</option>
+											<option value="IL">IL</option>
+											<option value="IN">IN</option>
+											<option value="IA">IA</option>
+											<option value="KS">KS</option>
+											<option value="KY">KY</option>
+											<option value="LA">LA</option>
+											<option value="ME">ME</option>
+											<option value="MD">MD</option>
+											<option value="MA">MA</option>
+											<option value="MI">MI</option>
+											<option value="MN">MN</option>
+											<option value="MS">MS</option>
+											<option value="MO">MO</option>
+											<option value="MT">MT</option>
+											<option value="NE">NE</option>
+											<option value="NV">NV</option>
+											<option value="NH">NH</option>
+											<option value="NJ">NJ</option>
+											<option value="NM">NM</option>
+											<option value="NY">NY</option>
+											<option value="NC">NC</option>
+											<option value="ND">ND</option>
+											<option value="OH">OH</option>
+											<option value="OK">OK</option>
+											<option value="OR">OR</option>
+											<option value="PA">PA</option>
+											<option value="RI">RI</option>
+											<option value="SC">SC</option>
+											<option value="SD">SD</option>
+											<option value="TN">TN</option>
+											<option value="TX">TX</option>
+											<option value="UT">UT</option>
+											<option value="VT">VT</option>
+											<option value="VA">VA</option>
+											<option value="WA">WA</option>
+											<option value="WV">WV</option>
+											<option value="WI">WI</option>
+											<option value="WY">WY</option>
+										</select>
+									</td>
+									<td class="py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+										<button
+											type="submit"
+											class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+										>
+											Add
 										</button>
 									</td>
-								</tr>
+								</form>
+							</tr>
+							<!-- Existing companies -->
+							for _, company := range companies {
+								@CompanyRow(company)
 							}
 						</tbody>
 					</table>

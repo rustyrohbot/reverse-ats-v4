@@ -107,6 +107,13 @@ func (h *CompaniesHandler) Create(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
+	// If HTMX request, return just the new row
+	if r.Header.Get("HX-Request") == "true" {
+		company := recordToCompany(record)
+		return templates.CompanyRow(company).Render(r.Context(), w)
+	}
+
+	// Otherwise redirect
 	http.Redirect(w, r, "/companies", http.StatusSeeOther)
 	return nil
 }
@@ -183,6 +190,13 @@ func (h *CompaniesHandler) Delete(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
+	// If HTMX request, return empty response (row will be removed)
+	if r.Header.Get("HX-Request") == "true" {
+		w.WriteHeader(http.StatusOK)
+		return nil
+	}
+
+	// Otherwise redirect
 	http.Redirect(w, r, "/companies", http.StatusSeeOther)
 	return nil
 }
