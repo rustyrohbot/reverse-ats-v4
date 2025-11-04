@@ -4,20 +4,32 @@ import "time"
 
 // FormatDateToText converts ISO format dates to text format for display.
 // "2025-10-01" → "October 1, 2025"
+// "2025-10-20 00:00:00.000Z" → "October 20, 2025"
 // "October 1, 2025" → "October 1, 2025" (unchanged)
 func FormatDateToText(dateStr string) string {
 	if dateStr == "" {
 		return ""
 	}
 
-	// Try to parse as ISO format first
-	t, err := time.Parse("2006-01-02", dateStr)
-	if err == nil {
-		// Successfully parsed as ISO, convert to text format
-		return t.Format("January 2, 2006")
+	// Try multiple date/datetime formats
+	formats := []string{
+		"2006-01-02",                        // ISO date: 2025-10-20
+		"2006-01-02 15:04:05.999999999Z07:00", // ISO datetime with nanoseconds: 2025-10-20 00:00:00.000Z
+		"2006-01-02 15:04:05.999999999Z",    // ISO datetime with nanoseconds: 2025-10-20 00:00:00.000Z
+		"2006-01-02T15:04:05.999999999Z",    // ISO8601 datetime: 2025-10-20T00:00:00.000Z
+		"2006-01-02 15:04:05",               // datetime without timezone: 2025-10-20 00:00:00
+		time.RFC3339,                        // RFC3339 format
+		time.RFC3339Nano,                    // RFC3339 with nanoseconds
 	}
 
-	// Not ISO format, return as-is (assume it's already in text format)
+	for _, format := range formats {
+		if t, err := time.Parse(format, dateStr); err == nil {
+			// Successfully parsed, convert to text format
+			return t.Format("January 2, 2006")
+		}
+	}
+
+	// Not a recognized format, return as-is (assume it's already in text format)
 	return dateStr
 }
 
