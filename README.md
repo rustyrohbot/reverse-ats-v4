@@ -14,10 +14,54 @@ A web application for tracking job applications, interviews, and contacts during
 
 ### Prerequisites
 
+**Option 1: Docker (Recommended)**
+- Docker and Docker Compose
+
+**Option 2: Local Development**
 - Go 1.23 or later
 - Node.js (for Tailwind CSS)
 
-### Installation
+### Running with Docker
+
+The easiest way to run the application is with Docker:
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd reverse-ats-v4
+```
+
+2. Start the application:
+```bash
+make docker-up
+# or
+docker-compose up -d
+```
+
+The application will be available at `http://localhost:5627`
+
+**Docker Commands:**
+
+```bash
+# Start container (detached)
+make docker-up
+
+# View logs
+make docker-logs
+
+# Restart container
+make docker-restart
+
+# Stop container
+make docker-down
+
+# Rebuild image
+make docker-build
+```
+
+**Data Persistence:** The `pb_data/` directory is mounted as a volume, so your data persists across container restarts.
+
+### Local Installation
 
 1. Clone the repository:
 ```bash
@@ -43,7 +87,7 @@ make install-tools
    ```
    Note: PocketBase migrations run automatically on first use. You can also import via the web interface after starting the server.
 
-### Development
+### Local Development
 
 Start the development server:
 ```bash

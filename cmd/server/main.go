@@ -4,9 +4,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
-	"runtime"
-	"time"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -14,26 +11,6 @@ import (
 	"reverse-ats/internal/handlers"
 	_ "reverse-ats/pb_migrations"
 )
-
-func openBrowser(url string) error {
-	var cmd string
-	var args []string
-
-	switch runtime.GOOS {
-	case "windows":
-		cmd = "cmd"
-		args = []string{"/c", "start"}
-	case "darwin":
-		cmd = "open"
-		args = []string{url}
-		return exec.Command(cmd, args...).Start()
-	default: // "linux", "freebsd", "openbsd", "netbsd"
-		cmd = "xdg-open"
-		args = []string{url}
-	}
-	args = append(args, url)
-	return exec.Command(cmd, args...).Start()
-}
 
 func main() {
 	// Initialize PocketBase
@@ -188,16 +165,6 @@ func main() {
 	// Start the server
 	log.Printf("Starting server on http://localhost:%s", port)
 	log.Printf("PocketBase admin UI available at http://localhost:%s/_/", port)
-
-	// Open browser after server starts
-	go func() {
-		// Wait a bit for server to start
-		time.Sleep(500 * time.Millisecond)
-		url := "http://localhost:" + port
-		if err := openBrowser(url); err != nil {
-			log.Printf("Failed to open browser: %v", err)
-		}
-	}()
 
 	// Set command line args to force serve mode
 	// PocketBase expects: program serve --http=host:port

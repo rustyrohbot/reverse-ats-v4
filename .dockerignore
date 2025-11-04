@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Data directories (will be mounted as volumes)
+pb_data/
+import/
+export/
+
+# Build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+
+# Documentation
+*.md
+
+# Node modules (will be reinstalled in build)
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
