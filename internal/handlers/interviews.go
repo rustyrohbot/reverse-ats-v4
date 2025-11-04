@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -21,13 +22,49 @@ func NewInterviewsHandler(app *pocketbase.PocketBase) *InterviewsHandler {
 	return &InterviewsHandler{app: app}
 }
 
+// convertTimeTo24Hour converts 12-hour time format (e.g., "12:00 PM") to 24-hour format (e.g., "12:00")
+func convertTimeTo24Hour(timeStr string) string {
+	if timeStr == "" {
+		return ""
+	}
+
+	// Try to parse as 12-hour format first
+	formats := []string{
+		"3:04 PM",
+		"03:04 PM",
+		"15:04",    // Already 24-hour
+		"3:04",     // Already 24-hour without leading zero
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, timeStr); err == nil {
+			// Return in 24-hour format HH:MM
+			return t.Format("15:04")
+		}
+	}
+
+	// If all parsing fails, return original
+	return timeStr
+}
+
 func recordToInterview(record *core.Record) models.Interview {
+	// Extract date properly from DateField
+	dateValue := ""
+	if dt := record.GetDateTime("date"); !dt.IsZero() {
+		// Format as YYYY-MM-DD for HTML date input
+		dateValue = dt.Time().Format("2006-01-02")
+	}
+
+	// Convert times to 24-hour format for HTML time inputs
+	startTime := convertTimeTo24Hour(record.GetString("start"))
+	endTime := convertTimeTo24Hour(record.GetString("end"))
+
 	interview := models.Interview{
 		ID:        record.Id,
 		RoleID:    record.GetString("role"),
-		Date:      record.GetString("date"),
-		Start:     record.GetString("start"),
-		End:       record.GetString("end"),
+		Date:      dateValue,
+		Start:     startTime,
+		End:       endTime,
 		Notes:     record.GetString("notes"),
 		Type:      record.GetString("type"),
 		CreatedAt: record.GetDateTime("created").String(),
@@ -156,7 +193,22 @@ func (h *InterviewsHandler) List(w http.ResponseWriter, r *http.Request) error {
 		roles[i] = role
 	}
 
-	return templates.InterviewsList(interviews, sortBy, order, roles).Render(r.Context(), w)
+	// Fetch companies for dropdown
+	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	if err != nil {
+		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
+		return err
+	}
+
+	companies := make([]models.Company, len(companyRecords))
+	for i, record := range companyRecords {
+		companies[i] = models.Company{
+			ID:   record.Id,
+			Name: record.GetString("name"),
+		}
+	}
+
+	return templates.InterviewsList(interviews, sortBy, order, companies).Render(r.Context(), w)
 }
 
 func (h *InterviewsHandler) New(w http.ResponseWriter, r *http.Request) error {
@@ -355,5 +407,32 @@ func (h *InterviewsHandler) Delete(w http.ResponseWriter, r *http.Request) error
 
 	// Otherwise redirect
 	http.Redirect(w, r, "/interviews", http.StatusSeeOther)
+	return nil
+}
+
+// GetRolesByCompany returns role options for a selected company
+func (h *InterviewsHandler) GetRolesByCompany(w http.ResponseWriter, r *http.Request) error {
+	companyID := r.URL.Query().Get("company")
+	if companyID == "" {
+		w.Write([]byte(`<option value="">Select company first</option>`))
+		return nil
+	}
+
+	// Fetch roles for this company
+	filter := fmt.Sprintf("company='%s'", companyID)
+	roleRecords, err := h.app.FindRecordsByFilter("roles", filter, "name", -1, 0)
+	if err != nil {
+		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
+		return err
+	}
+
+	// Build HTML options
+	html := `<option value="">Select Role *</option>`
+	for _, record := range roleRecords {
+		html += fmt.Sprintf(`<option value="%s">%s</option>`, record.Id, record.GetString("name"))
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(html))
 	return nil
 }

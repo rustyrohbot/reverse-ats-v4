@@ -18,10 +18,10 @@ templ InterviewRow(interview models.Interview) {
 			{ util.FormatDateToText(interview.Date) }
 		</td>
 		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-			{ interview.Start }
+			{ util.FormatTimeTo12Hour(interview.Start) }
 		</td>
 		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-			{ interview.End }
+			{ util.FormatTimeTo12Hour(interview.End) }
 		</td>
 		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
 			{ interview.Type }
@@ -52,7 +52,7 @@ templ InterviewRow(interview models.Interview) {
 	</tr>
 }
 
-templ InterviewsList(interviews []models.Interview, sortBy, order string, roles []models.Role) {
+templ InterviewsList(interviews []models.Interview, sortBy, order string, companies []models.Company) {
 	@Layout("Interviews") {
 		<div class="sm:flex sm:items-center mb-6">
 			<div class="sm:flex-auto">
@@ -98,16 +98,30 @@ templ InterviewsList(interviews []models.Interview, sortBy, order string, roles 
 									hx-on::after-request="this.reset()"
 									class="contents"
 								>
-									<td class="py-4 pl-4 pr-3 text-sm sm:pl-6" colspan="2">
+									<td class="py-4 pl-4 pr-3 text-sm sm:pl-6">
+										<select
+											name="company"
+											id="company-select"
+											required
+											hx-get="/api/roles-by-company"
+											hx-target="#role-select"
+											hx-trigger="change"
+											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+										>
+											<option value="">Company *</option>
+											for _, company := range companies {
+												<option value={ company.ID }>{ company.Name }</option>
+											}
+										</select>
+									</td>
+									<td class="px-3 py-4 text-sm">
 										<select
 											name="role"
+											id="role-select"
 											required
 											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
 										>
-											<option value="">Select Role *</option>
-											for _, role := range roles {
-												<option value={ role.ID }>{ role.CompanyName } - { role.Name }</option>
-											}
+											<option value="">Select company first</option>
 										</select>
 									</td>
 									<td class="px-3 py-4 text-sm">
@@ -122,7 +136,7 @@ templ InterviewsList(interviews []models.Interview, sortBy, order string, roles 
 										<input
 											type="time"
 											name="start"
-											placeholder="HH:MM"
+											required
 											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
 										/>
 									</td>
@@ -130,16 +144,17 @@ templ InterviewsList(interviews []models.Interview, sortBy, order string, roles 
 										<input
 											type="time"
 											name="end"
-											placeholder="HH:MM"
+											required
 											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
 										/>
 									</td>
 									<td class="px-3 py-4 text-sm">
 										<select
 											name="type"
+											required
 											class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
 										>
-											<option value="">Type</option>
+											<option value="">Type *</option>
 											<option value="RECRUITER">Recruiter</option>
 											<option value="TECH_SCREEN">Tech Screen</option>
 											<option value="MANAGER">Manager</option>

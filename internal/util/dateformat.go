@@ -20,3 +20,30 @@ func FormatDateToText(dateStr string) string {
 	// Not ISO format, return as-is (assume it's already in text format)
 	return dateStr
 }
+
+// FormatTimeTo12Hour converts 24-hour time format to 12-hour format for display.
+// "14:30" → "2:30 PM"
+// "09:00" → "9:00 AM"
+// "12:00 PM" → "12:00 PM" (unchanged if already 12-hour)
+func FormatTimeTo12Hour(timeStr string) string {
+	if timeStr == "" {
+		return ""
+	}
+
+	// Try to parse as 24-hour format
+	formats := []string{
+		"15:04",    // 24-hour HH:MM
+		"3:04 PM",  // Already 12-hour
+		"03:04 PM", // Already 12-hour with leading zero
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, timeStr); err == nil {
+			// Return in 12-hour format without leading zero
+			return t.Format("3:04 PM")
+		}
+	}
+
+	// If all parsing fails, return original
+	return timeStr
+}

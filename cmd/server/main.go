@@ -162,6 +162,11 @@ func main() {
 			return interviewsHandler.Delete(e.Response, e.Request)
 		})
 
+		// API route for cascading dropdowns
+		se.Router.GET("/api/roles-by-company", func(e *core.RequestEvent) error {
+			return interviewsHandler.GetRolesByCompany(e.Response, e.Request)
+		})
+
 		// Stats route
 		se.Router.GET("/stats", func(e *core.RequestEvent) error {
 			return statsHandler.Show(e.Response, e.Request)
