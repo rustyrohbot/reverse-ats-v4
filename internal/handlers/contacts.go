@@ -11,6 +11,7 @@ import (
 
 	"reverse-ats/internal/models"
 	"reverse-ats/internal/templates"
+	"reverse-ats/internal/util"
 )
 
 type ContactsHandler struct {
@@ -104,14 +105,21 @@ func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	// Convert records to Contact structs and fetch company names
+	// Fetch all companies once to avoid N+1 queries
+	companiesMap, err := util.FetchCompaniesMap(h.app)
+	if err != nil {
+		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
+		return err
+	}
+
+	// Convert records to Contact structs with company names
 	contacts := make([]models.Contact, len(records))
 	for i, record := range records {
 		contact := recordToContact(record)
-		// Manually fetch company name
+		// Look up company name from map
 		if companyID := record.GetString("company"); companyID != "" {
-			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
-				contact.CompanyName = companyRecord.GetString("name")
+			if companyName, ok := companiesMap[companyID]; ok {
+				contact.CompanyName = companyName
 			}
 		}
 		contacts[i] = contact
@@ -123,18 +131,10 @@ func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Fetch companies for inline form dropdown
-	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	companies, err := util.FetchCompaniesForDropdown(h.app)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
 		return err
-	}
-
-	companies := make([]models.Company, len(companyRecords))
-	for i, record := range companyRecords {
-		companies[i] = models.Company{
-			ID:   record.Id,
-			Name: record.GetString("name"),
-		}
 	}
 
 	return templates.ContactsList(contacts, sortBy, order, companies).Render(r.Context(), w)
@@ -142,15 +142,10 @@ func (h *ContactsHandler) List(w http.ResponseWriter, r *http.Request) error {
 
 func (h *ContactsHandler) New(w http.ResponseWriter, r *http.Request) error {
 	// Fetch companies for dropdown
-	records, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	companies, err := util.FetchCompaniesForDropdown(h.app)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
 		return err
-	}
-
-	companies := make([]models.Company, len(records))
-	for i, record := range records {
-		companies[i] = recordToCompany(record)
 	}
 
 	return templates.ContactFormNew(companies).Render(r.Context(), w)
@@ -162,7 +157,7 @@ func (h *ContactsHandler) Create(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	collection, err := h.app.FindCollectionByNameOrId("contacts")
+	collection, err := h.app.FindCollectionByNameOrId(util.CollectionContacts)
 	if err != nil {
 		http.Error(w, "Failed to find collection", http.StatusInternalServerError)
 		return err
@@ -188,7 +183,7 @@ func (h *ContactsHandler) Create(w http.ResponseWriter, r *http.Request) error {
 		contact := recordToContact(record)
 		// Fetch company name for display
 		if companyID := record.GetString("company"); companyID != "" {
-			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+			if companyRecord, err := h.app.FindRecordById(util.CollectionCompanies, companyID); err == nil {
 				contact.CompanyName = companyRecord.GetString("name")
 			}
 		}
@@ -208,7 +203,7 @@ func (h *ContactsHandler) Edit(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("missing id parameter")
 	}
 
-	record, err := h.app.FindRecordById("contacts", id)
+	record, err := h.app.FindRecordById(util.CollectionContacts, id)
 	if err != nil {
 		http.Error(w, "Contact not found", http.StatusNotFound)
 		return err
@@ -218,21 +213,16 @@ func (h *ContactsHandler) Edit(w http.ResponseWriter, r *http.Request) error {
 
 	// Fetch company name for display
 	if companyID := record.GetString("company"); companyID != "" {
-		if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+		if companyRecord, err := h.app.FindRecordById(util.CollectionCompanies, companyID); err == nil {
 			contact.CompanyName = companyRecord.GetString("name")
 		}
 	}
 
 	// Fetch companies for dropdown
-	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	companies, err := util.FetchCompaniesForDropdown(h.app)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
 		return err
-	}
-
-	companies := make([]models.Company, len(companyRecords))
-	for i, rec := range companyRecords {
-		companies[i] = recordToCompany(rec)
 	}
 
 	return templates.ContactFormEdit(contact, companies).Render(r.Context(), w)
@@ -251,13 +241,13 @@ func (h *ContactsHandler) Update(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	record, err := h.app.FindRecordById("contacts", id)
+	record, err := h.app.FindRecordById(util.CollectionContacts, id)
 	if err != nil {
 		http.Error(w, "Contact not found", http.StatusNotFound)
 		return err
 	}
 
-	record.Set("company", r.FormValue("company_id"))
+	record.Set("company", r.FormValue("company"))
 	record.Set("first_name", r.FormValue("first_name"))
 	record.Set("last_name", r.FormValue("last_name"))
 	record.Set("role", r.FormValue("role"))
@@ -283,7 +273,7 @@ func (h *ContactsHandler) Delete(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("missing id parameter")
 	}
 
-	record, err := h.app.FindRecordById("contacts", id)
+	record, err := h.app.FindRecordById(util.CollectionContacts, id)
 	if err != nil {
 		http.Error(w, "Contact not found", http.StatusNotFound)
 		return err

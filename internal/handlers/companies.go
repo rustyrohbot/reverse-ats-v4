@@ -9,6 +9,7 @@ import (
 
 	"reverse-ats/internal/models"
 	"reverse-ats/internal/templates"
+	"reverse-ats/internal/util"
 )
 
 type CompaniesHandler struct {
@@ -88,7 +89,7 @@ func (h *CompaniesHandler) Create(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	collection, err := h.app.FindCollectionByNameOrId("companies")
+	collection, err := h.app.FindCollectionByNameOrId(util.CollectionCompanies)
 	if err != nil {
 		http.Error(w, "Failed to find collection", http.StatusInternalServerError)
 		return err
@@ -126,7 +127,7 @@ func (h *CompaniesHandler) Edit(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("missing id parameter")
 	}
 
-	record, err := h.app.FindRecordById("companies", id)
+	record, err := h.app.FindRecordById(util.CollectionCompanies, id)
 	if err != nil {
 		http.Error(w, "Company not found", http.StatusNotFound)
 		return err
@@ -149,7 +150,7 @@ func (h *CompaniesHandler) Update(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	record, err := h.app.FindRecordById("companies", id)
+	record, err := h.app.FindRecordById(util.CollectionCompanies, id)
 	if err != nil {
 		http.Error(w, "Company not found", http.StatusNotFound)
 		return err
@@ -179,7 +180,7 @@ func (h *CompaniesHandler) Delete(w http.ResponseWriter, r *http.Request) error 
 		return fmt.Errorf("missing id parameter")
 	}
 
-	record, err := h.app.FindRecordById("companies", id)
+	record, err := h.app.FindRecordById(util.CollectionCompanies, id)
 	if err != nil {
 		http.Error(w, "Company not found", http.StatusNotFound)
 		return err

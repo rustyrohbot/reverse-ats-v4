@@ -12,6 +12,7 @@ import (
 
 	"reverse-ats/internal/models"
 	"reverse-ats/internal/templates"
+	"reverse-ats/internal/util"
 )
 
 type RolesHandler struct {
@@ -123,14 +124,21 @@ func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	// Convert records to Role structs and fetch company names
+	// Fetch all companies once to avoid N+1 queries
+	companiesMap, err := util.FetchCompaniesMap(h.app)
+	if err != nil {
+		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
+		return err
+	}
+
+	// Convert records to Role structs with company names
 	roles := make([]models.Role, len(records))
 	for i, record := range records {
 		role := recordToRole(record)
-		// Manually fetch company name
+		// Look up company name from map
 		if companyID := record.GetString("company"); companyID != "" {
-			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
-				role.CompanyName = companyRecord.GetString("name")
+			if companyName, ok := companiesMap[companyID]; ok {
+				role.CompanyName = companyName
 			}
 		}
 		roles[i] = role
@@ -142,18 +150,10 @@ func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Fetch companies for inline form dropdown
-	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	companies, err := util.FetchCompaniesForDropdown(h.app)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
 		return err
-	}
-
-	companies := make([]models.Company, len(companyRecords))
-	for i, record := range companyRecords {
-		companies[i] = models.Company{
-			ID:   record.Id,
-			Name: record.GetString("name"),
-		}
 	}
 
 	return templates.RolesList(roles, sortBy, order, companies).Render(r.Context(), w)
@@ -161,15 +161,10 @@ func (h *RolesHandler) List(w http.ResponseWriter, r *http.Request) error {
 
 func (h *RolesHandler) New(w http.ResponseWriter, r *http.Request) error {
 	// Fetch companies for dropdown
-	records, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	companies, err := util.FetchCompaniesForDropdown(h.app)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
 		return err
-	}
-
-	companies := make([]models.Company, len(records))
-	for i, record := range records {
-		companies[i] = recordToCompany(record)
 	}
 
 	return templates.RoleFormNew(companies).Render(r.Context(), w)
@@ -181,7 +176,7 @@ func (h *RolesHandler) Create(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	collection, err := h.app.FindCollectionByNameOrId("roles")
+	collection, err := h.app.FindCollectionByNameOrId(util.CollectionRoles)
 	if err != nil {
 		http.Error(w, "Failed to find collection", http.StatusInternalServerError)
 		return err
@@ -242,7 +237,7 @@ func (h *RolesHandler) Edit(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("missing id parameter")
 	}
 
-	record, err := h.app.FindRecordById("roles", id)
+	record, err := h.app.FindRecordById(util.CollectionRoles, id)
 	if err != nil {
 		http.Error(w, "Role not found", http.StatusNotFound)
 		return err
@@ -252,21 +247,16 @@ func (h *RolesHandler) Edit(w http.ResponseWriter, r *http.Request) error {
 
 	// Fetch company name for display
 	if companyID := record.GetString("company"); companyID != "" {
-		if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+		if companyRecord, err := h.app.FindRecordById(util.CollectionCompanies, companyID); err == nil {
 			role.CompanyName = companyRecord.GetString("name")
 		}
 	}
 
 	// Fetch companies for dropdown
-	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	companies, err := util.FetchCompaniesForDropdown(h.app)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
 		return err
-	}
-
-	companies := make([]models.Company, len(companyRecords))
-	for i, rec := range companyRecords {
-		companies[i] = recordToCompany(rec)
 	}
 
 	return templates.RoleFormEdit(role, companies).Render(r.Context(), w)
@@ -285,13 +275,13 @@ func (h *RolesHandler) Update(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	record, err := h.app.FindRecordById("roles", id)
+	record, err := h.app.FindRecordById(util.CollectionRoles, id)
 	if err != nil {
 		http.Error(w, "Role not found", http.StatusNotFound)
 		return err
 	}
 
-	record.Set("company", r.FormValue("company_id"))
+	record.Set("company", r.FormValue("company"))
 	record.Set("name", r.FormValue("name"))
 	record.Set("url", r.FormValue("url"))
 	record.Set("description", r.FormValue("description"))
@@ -342,7 +332,7 @@ func (h *RolesHandler) Delete(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("missing id parameter")
 	}
 
-	record, err := h.app.FindRecordById("roles", id)
+	record, err := h.app.FindRecordById(util.CollectionRoles, id)
 	if err != nil {
 		http.Error(w, "Role not found", http.StatusNotFound)
 		return err

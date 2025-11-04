@@ -12,6 +12,7 @@ import (
 
 	"reverse-ats/internal/models"
 	"reverse-ats/internal/templates"
+	"reverse-ats/internal/util"
 )
 
 type InterviewsHandler struct {
@@ -142,21 +143,32 @@ func (h *InterviewsHandler) List(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Convert records to Interview structs and fetch role/company info
+	// Fetch all roles and companies once to avoid N+1 queries
+	rolesMap, err := util.FetchRolesMap(h.app)
+	if err != nil {
+		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
+		return err
+	}
+
+	companiesMap, err := util.FetchCompaniesMap(h.app)
+	if err != nil {
+		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
+		return err
+	}
+
 	interviews := make([]models.Interview, len(records))
 	for i, record := range records {
 		interview := recordToInterview(record)
 
-		// Fetch role to get role name and company info
+		// Look up role and company info from maps
 		if roleID := record.GetString("role"); roleID != "" {
-			if roleRecord, err := h.app.FindRecordById("roles", roleID); err == nil {
-				interview.RoleName = roleRecord.GetString("name")
-				interview.CompanyID = roleRecord.GetString("company")
+			if roleInfo, ok := rolesMap[roleID]; ok {
+				interview.RoleName = roleInfo.Name
+				interview.CompanyID = roleInfo.CompanyID
 
-				// Fetch company name
-				if companyID := roleRecord.GetString("company"); companyID != "" {
-					if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
-						interview.CompanyName = companyRecord.GetString("name")
-					}
+				// Look up company name
+				if companyName, ok := companiesMap[roleInfo.CompanyID]; ok {
+					interview.CompanyName = companyName
 				}
 			}
 		}
@@ -169,13 +181,13 @@ func (h *InterviewsHandler) List(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Fetch roles with company info for inline form dropdown
-	roleRecords, err := h.app.FindRecordsByFilter("roles", "", "name", -1, 0)
+	roleRecords, err := h.app.FindRecordsByFilter(util.CollectionRoles, "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
 		return err
 	}
 
-	// Convert to Role format with company names
+	// Convert to Role format with company names (reuse companiesMap)
 	roles := make([]models.Role, len(roleRecords))
 	for i, record := range roleRecords {
 		role := models.Role{
@@ -184,28 +196,20 @@ func (h *InterviewsHandler) List(w http.ResponseWriter, r *http.Request) error {
 			CompanyID: record.GetString("company"),
 		}
 
-		// Fetch company name
+		// Look up company name from map
 		if companyID := record.GetString("company"); companyID != "" {
-			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
-				role.CompanyName = companyRecord.GetString("name")
+			if companyName, ok := companiesMap[companyID]; ok {
+				role.CompanyName = companyName
 			}
 		}
 		roles[i] = role
 	}
 
 	// Fetch companies for dropdown
-	companyRecords, err := h.app.FindRecordsByFilter("companies", "", "name", -1, 0)
+	companies, err := util.FetchCompaniesForDropdown(h.app)
 	if err != nil {
 		http.Error(w, "Failed to fetch companies", http.StatusInternalServerError)
 		return err
-	}
-
-	companies := make([]models.Company, len(companyRecords))
-	for i, record := range companyRecords {
-		companies[i] = models.Company{
-			ID:   record.Id,
-			Name: record.GetString("name"),
-		}
 	}
 
 	return templates.InterviewsList(interviews, sortBy, order, companies).Render(r.Context(), w)
@@ -213,7 +217,7 @@ func (h *InterviewsHandler) List(w http.ResponseWriter, r *http.Request) error {
 
 func (h *InterviewsHandler) New(w http.ResponseWriter, r *http.Request) error {
 	// Fetch roles with company info for dropdown
-	roleRecords, err := h.app.FindRecordsByFilter("roles", "", "name", -1, 0)
+	roleRecords, err := h.app.FindRecordsByFilter(util.CollectionRoles, "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
 		return err
@@ -230,7 +234,7 @@ func (h *InterviewsHandler) New(w http.ResponseWriter, r *http.Request) error {
 
 		// Fetch company name
 		if companyID := record.GetString("company"); companyID != "" {
-			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+			if companyRecord, err := h.app.FindRecordById(util.CollectionCompanies, companyID); err == nil {
 				role.CompanyName = companyRecord.GetString("name")
 			}
 		}
@@ -246,7 +250,7 @@ func (h *InterviewsHandler) Create(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
-	collection, err := h.app.FindCollectionByNameOrId("interviews")
+	collection, err := h.app.FindCollectionByNameOrId(util.CollectionInterviews)
 	if err != nil {
 		http.Error(w, "Failed to find collection", http.StatusInternalServerError)
 		return err
@@ -272,13 +276,13 @@ func (h *InterviewsHandler) Create(w http.ResponseWriter, r *http.Request) error
 
 		// Fetch role to get role name and company info
 		if roleID := record.GetString("role"); roleID != "" {
-			if roleRecord, err := h.app.FindRecordById("roles", roleID); err == nil {
+			if roleRecord, err := h.app.FindRecordById(util.CollectionRoles, roleID); err == nil {
 				interview.RoleName = roleRecord.GetString("name")
 				interview.CompanyID = roleRecord.GetString("company")
 
 				// Fetch company name
 				if companyID := roleRecord.GetString("company"); companyID != "" {
-					if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+					if companyRecord, err := h.app.FindRecordById(util.CollectionCompanies, companyID); err == nil {
 						interview.CompanyName = companyRecord.GetString("name")
 					}
 				}
@@ -301,7 +305,7 @@ func (h *InterviewsHandler) Edit(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("missing id parameter")
 	}
 
-	record, err := h.app.FindRecordById("interviews", id)
+	record, err := h.app.FindRecordById(util.CollectionInterviews, id)
 	if err != nil {
 		http.Error(w, "Interview not found", http.StatusNotFound)
 		return err
@@ -311,13 +315,13 @@ func (h *InterviewsHandler) Edit(w http.ResponseWriter, r *http.Request) error {
 
 	// Fetch role info for display
 	if roleID := record.GetString("role"); roleID != "" {
-		if roleRecord, err := h.app.FindRecordById("roles", roleID); err == nil {
+		if roleRecord, err := h.app.FindRecordById(util.CollectionRoles, roleID); err == nil {
 			interview.RoleName = roleRecord.GetString("name")
 		}
 	}
 
 	// Fetch roles with company info for dropdown
-	roleRecords, err := h.app.FindRecordsByFilter("roles", "", "name", -1, 0)
+	roleRecords, err := h.app.FindRecordsByFilter(util.CollectionRoles, "", "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
 		return err
@@ -334,7 +338,7 @@ func (h *InterviewsHandler) Edit(w http.ResponseWriter, r *http.Request) error {
 
 		// Fetch company name
 		if companyID := rec.GetString("company"); companyID != "" {
-			if companyRecord, err := h.app.FindRecordById("companies", companyID); err == nil {
+			if companyRecord, err := h.app.FindRecordById(util.CollectionCompanies, companyID); err == nil {
 				role.CompanyName = companyRecord.GetString("name")
 			}
 		}
@@ -357,7 +361,7 @@ func (h *InterviewsHandler) Update(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
-	record, err := h.app.FindRecordById("interviews", id)
+	record, err := h.app.FindRecordById(util.CollectionInterviews, id)
 	if err != nil {
 		http.Error(w, "Interview not found", http.StatusNotFound)
 		return err
@@ -388,7 +392,7 @@ func (h *InterviewsHandler) Delete(w http.ResponseWriter, r *http.Request) error
 		return fmt.Errorf("missing id parameter")
 	}
 
-	record, err := h.app.FindRecordById("interviews", id)
+	record, err := h.app.FindRecordById(util.CollectionInterviews, id)
 	if err != nil {
 		http.Error(w, "Interview not found", http.StatusNotFound)
 		return err
@@ -418,9 +422,16 @@ func (h *InterviewsHandler) GetRolesByCompany(w http.ResponseWriter, r *http.Req
 		return nil
 	}
 
-	// Fetch roles for this company
+	// Validate that company ID exists to prevent injection
+	_, err := h.app.FindRecordById(util.CollectionCompanies, companyID)
+	if err != nil {
+		w.Write([]byte(`<option value="">Invalid company</option>`))
+		return nil
+	}
+
+	// Fetch roles for this company using safe filter syntax
 	filter := fmt.Sprintf("company='%s'", companyID)
-	roleRecords, err := h.app.FindRecordsByFilter("roles", filter, "name", -1, 0)
+	roleRecords, err := h.app.FindRecordsByFilter(util.CollectionRoles, filter, "name", -1, 0)
 	if err != nil {
 		http.Error(w, "Failed to fetch roles", http.StatusInternalServerError)
 		return err
